@@ -1,0 +1,151 @@
+---
+title: "Data Dive - GLMs (Part 2)"
+author: "Amritha Prakash"
+date: "2023-11-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 11
+
+### Task(s)
+
+-   Part 1: Build a linear (or generalized linear) model as you like
+    -   Use whatever response variable and explanatory variables you prefer
+
+-   Part 2: Use the tools from previous weeks to diagnose the model.
+    -   Highlight any issues with the model.
+    
+-   Part 3: Interpret at least one of the coefficients
+
+------------------------------------------------------------------------
+
+### **Read the Data**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(dplyr)
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(broom)
+library(lindia)
+```
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+------------------------------------------------------------------------
+
+**1. Part 1 -** Build a linear (or generalized linear) model as you like
+
+-   Since the data set is about a Superstore, will try to figure out the profit for certain region say "West"
+-   Let the **Response variable be Profit** and **Explanatory variable be Sales.** 
+-   Unable to take multiple explanatory variables as they would end up being binary if converted the categorical columns. Not much can be figured out in a linear model for same.
+
+```{r}
+Sup_data_filtered <- Superstore_data |>
+  filter(Profit >0, Region == 'West', Segment== 'Home Office') 
+
+sup_grouped <-
+  Superstore_data |>
+  filter(Profit >0, Region == 'West', Segment== 'Home Office') |>
+  group_by(Region) |>
+  summarise(mean_profit = mean(Profit)) 
+
+sup_grouped
+```
+
+```{r}
+
+Sup_data_filtered |>
+  ggplot() +
+  geom_point(mapping = aes( x= Sales, y = Profit)) +
+  geom_hline(data = sup_grouped,
+             mapping = aes(yintercept = mean_profit),
+             color = 'darkorange', linetype = 'dashed') +
+  labs(title = "Profit by Sales Price for Western Region - Segment : Home Office",
+       x = "Sales", y = "Profit") +
+  theme_minimal()
+```
+
+
+```{r}
+model <- lm( Profit ~ Sales, data = Sup_data_filtered)
+
+model$coefficients
+```
+
+```{r}
+Sup_data_filtered |>
+  ggplot(mapping = aes( x= Sales, y = Profit)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE, linewidth = 0.5) +
+  labs(title = "Profit by Sales Price for Western Region",
+       x = "Sales", y = "Profit") +
+  theme_minimal()
+```
+
+Since the data is like a cone in shape will try to make use of transformation to Response variable i.e. Profit.
+
+```{r}
+
+Sup_data_filtered <- Sup_data_filtered |>
+  mutate(log_profit_square = (log(Profit))**2)
+
+Sup_data_filtered |>
+  ggplot(mapping = aes(x = Sales, y = log_profit_square)) +
+  geom_point(shape = 'O', size = 3) +
+  labs(title = "Log(Price)^2 vs. Sales Price for Western Region") +
+  theme_minimal()
+```
+
+```{r}
+model <- glm( log_profit_square ~ Sales, data = Sup_data_filtered)
+
+model$coefficients
+
+```
+
+
+```{r}
+Sup_data_filtered |>
+  ggplot(mapping = aes(x = Sales, y = log_profit_square)) +
+  geom_smooth(method = 'glm', se = FALSE, linewidth = 0.5) +
+  geom_point(shape = 'O', size = 3) +
+  labs(title = "Log(Price)^2 vs. Sales Price for Western Region") +
+  theme_minimal()
+```
+
+**Part 2:** Use the tools from previous weeks to diagnose the model.Highlight any issues with the model.
+
+
+-   Can see that the plots are spread almost nearly. But profit for sales with minimum value aren't much spread out and overlap still (after transformation too).
+-   Not quite sure if any more better ways exist to read those such that they are 
+-   But overall can see that there is a linear relation between sales and profit for the western region where the product segment is Home Office.
+
+```{r}
+# Assess model fit
+summary(model)
+
+```
+
+
+**Part 3: ** -  Interpret at least one of the coefficients
+
+```{r}
+coef(model)
+```
+-   We can say that:
+    Intercept is the base value of Profit when there is not much sales for the Home Office segment of products within th western region. In our case, where the sales remain as it is i.e. irrespective of it, the Profit increases by 6.25227.
+    
+    For each unit increase in the sales, the log-odds of the “Profit” variable increases by approximately 0.0127788.
+    
+    
+    

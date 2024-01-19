@@ -1,0 +1,497 @@
+---
+title: "Project_SuperStore"
+author: "Amritha Prakash"
+date: "2023-11-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+
+We know that a lot of data exists in this world, and in order to analyse and get some inference of the same we need to go through a few steps. Statistics follows a framework which includes -  
+1. Obtaining an idea, as to an hypothesis based on certain element in the world (HYPOTHESIS)   
+2. Observing nature to obtain such kind of related data. ( SAMPLE DATA from POPULATION )   
+3. Recognize that the data collected is one out of the many observations in the world. ( PERFORM EXPLORATORY DATA ANALYSIS [EDA] )  
+4. Finding evidence against the idea by Insights ( PERFORM HYPOTHESIS TESTING -> Pulling reports)  
+5. Checking if the hypothesis matches our assumption/ hypothesis  
+
+Hence, as a part of the same framework I would be working to create a similar scenario.
+
+---
+
+As per my research and understanding I came across **Superstore data** in the initial week of the semester, which involved quite a lot of categorical and numerical features. This made me think about the various possibilities of what can be interpreted from the same data set. Following are the names of the columns -  
+- Ship Mode  
+- Segment  
+- Country  
+- City  
+- State  
+- Region  
+- Category  
+- Sub-Category  
+- Postal Code  
+- Sales
+- Quantity  
+- Discount  
+- Profit  
+
+
+Also, while working through, I came across a super set of the same data set with additional columns. 
+These are the additional Columns -  
+- Order Id  
+- Order Date  
+- Ship Date  
+- Customer ID  
+- Customer Name  
+- Product Name  
+- Product ID  
+
+
+Hence, am working with the compiled Super set of the data for **SuperStore Dataset** with 21 columns, as a part of this Project. 
+
+---
+
+#### **Data Pre-Processing**
+
+First to create an idea/hypothesis, did some Data Pr-processing to understand it better.  
+
+1.There are 9994 rows for Super Store Data. The Data is tidy with about 21 columns, Each row represents a unique and separate observation.  
+The same can be seen through the data cleaning / pre-processing 
+```{r}
+# load libraries 
+library(tidyverse)
+library(dplyr)
+
+Superstore_data=read.csv("US_Superstore_data.csv")
+head(Superstore_data)
+```
+
+Change format of 2 columns to Date Format (Data Cleaning) :-
+```{r}
+Superstore_data <- Superstore_data %>%
+  mutate(Order.Date = as.Date(Superstore_data$Order.Date , format = "%d-%m-%Y"),
+         Ship.Date = as.Date(Superstore_data$Ship.Date , format = "%d-%m-%Y"))
+head(Superstore_data)
+```
+
+
+
+Number of Records -  
+```{r}
+# Number of  records -
+nrow(Superstore_data)
+```
+
+Various columns within the Data set:-  
+```{r}
+colnames(Superstore_data)
+
+```
+
+
+**Summarize the Data set -**  
+*   For categorical columns, this should include unique values and counts
+
+1.Column Ship Mode :- 
+
+Unique values for the column - Ship Mode :-
+```{r}
+for (x in unique(Superstore_data$Ship.Mode)) {
+  print(x)
+}
+```
+Count of Unique Ship Modes :-
+```{r}
+n_distinct(Superstore_data$Ship.Mode)
+```
+
+2.Column Segment :-
+
+Unique values for the column - Segment :-
+```{r}
+for (x in unique(Superstore_data$Segment)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Segments: %s", n_distinct(Superstore_data$Segment))
+
+```
+3.Column Country :-
+
+Unique values for the column - Country
+```{r}
+for (x in unique(Superstore_data$Country)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Countries: %s", n_distinct(Superstore_data$Country))
+
+```
+Here above, we can see that the data exists only for United States, so while working with data we can remove this column as it is redundant.
+
+
+4.Column City :-
+
+Unique values for the column - City
+```{r}
+unique(Superstore_data$City)
+```
+5.Column State :-
+
+Unique values for the column - State
+```{r}
+unique(Superstore_data$State)
+```
+
+``` {r}
+sprintf("Count of the unique States: %s", n_distinct(Superstore_data$State))
+
+```
+
+6.Column Region :
+
+Unique values for the column - Region
+```{r}
+for (x in unique(Superstore_data$Region)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Regions: %s", n_distinct(Superstore_data$Region))
+
+```
+7.Column Category :-
+
+Unique values for the column - Category
+```{r}
+for (x in unique(Superstore_data$Category)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Categories: %s", n_distinct(Superstore_data$Category))
+
+```
+8.Sub-Category :-
+
+Unique values for the column - Sub-category
+```{r}
+sprintf("Unique values for the column - Sub-Category :"); 
+for (x in unique(Superstore_data$Sub.Category)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the Sub-Category: %s", n_distinct(Superstore_data$Sub.Category))
+
+```
+9.Postal Code :-
+
+Even though Postal code is numeric in nature, it doesn't have any value as the mean of a postal code wouldn't make sense. Hence considering it as a Categorical value.
+
+Unique values for the column - Postal code : 
+```{r}
+unique(Superstore_data$Postal.Code)
+```
+10.Order Date :-
+
+Unique orders dates for the column - Order ID
+```{r}
+n_distinct(Superstore_data$Order.Date)
+```
+
+```{r}
+order_year_from_date <- year(Superstore_data$Order.Date)
+unique(order_year_from_date)
+```
+From above can see that the data is for 4 years.  
+
+11.Order ID :-
+
+Unique orders placed for the column - Order ID
+```{r}
+n_distinct(Superstore_data$Order.ID)
+```
+12.Ship Date  :-  
+
+Unique shipping dates for each order placed column - Ship Date
+```{r}
+n_distinct(Superstore_data$Ship.Date)
+```
+
+```{r}
+ship_year_from_date <- year(Superstore_data$Ship.Date)
+unique(ship_year_from_date)
+```
+From above can see that the data for shipping is uptill 2018 i.e. total 5 years.
+
+
+13.Customer ID :-  
+Unique Customers for each order placed column - Customer ID
+```{r}
+n_distinct(Superstore_data$Customer.ID)
+```
+
+14.Customer Name :-  
+Unique Customers for each order placed column, check using Customer Name
+```{r}
+n_distinct(Superstore_data$Customer.Name)
+```
+Count of Customer.ID and Customer.Name match i.e. 793, which states that data is not having issues.
+Because each Customer ID / Name is unique.
+
+15.Product Name  :-
+Unique Products purchased in the orders placed, check using Product Name
+```{r}
+n_distinct(Superstore_data$Product.Name)
+```
+All unique Products :-
+```{r}
+#unique(Superstore_data$Product.Name)
+# printing each 1850 products would be too much hence have commented the above code
+```
+
+16.Product ID  :-
+Unique Products purchased in the orders placed, check using Product Name
+```{r}
+n_distinct(Superstore_data$Product.ID)
+```
+For Products, maybe the Primary key could be the Product ID, somewhere certain product names repeat hence Product Name count is slighly less than Product ID.
+
+
+*   For numeric columns, this includes min/max, central tendency, and some notion of distribution (e.g., quantiles)  
+
+17.Sales :-
+```{r}
+summary(Superstore_data$Sales)
+
+```
+18.Quantity :-
+```{r}
+summary(Superstore_data$Quantity)
+
+```
+
+19.Discount :-
+```{r}
+summary(Superstore_data$Discount)
+```
+
+20.Profit :-
+```{r}
+summary(Superstore_data$Profit)
+```
+
+
+
+* Summaries Combined :
+```{r}
+summary(Superstore_data)
+```
+
+* Distinct Count of each column -
+```{r}
+sapply(Superstore_data,function(x) n_distinct(x))
+```
+
+
+
+---
+  
+#### **Data Documentation**  
+  
+1.There are 16 categorical columns which are -
+Ship Mode, Segment, Country, City, State, Postal Code, Region, Category, Sub.Category, Order.ID, Order.Date, Ship.Date, Customer.ID, Customer.Name, Product ID, Product Name     
+(Here, considering Postal Code as Categorical as the numeric in the value does not have any significance. )
+
+2.While rest 4 columns are numerical/continuous in nature, they are - Sales(Price), Profit, Discount and Quantity, which are Decimal
+Also, Profit is having both positive and negative values. Negative values are indicating Loss.\
+-   *Sales* having a range of $0.444 to $22638.480 \
+-   *Profit* having a range starting from $-6599.978 to $8399.976 \
+-   *Discount* having a range from 0 to 0.8 \
+-   *Quantity* is numeric with a range starting from  1 to 14. \
+
+
+
+**Purpose of Data Collection**:- 
+To figure out the profit earned by the Superstore via its sales in various parts of USA. Further, it can be used to find trends in the same and come up with improvements. 
+
+Explanantion of each Columns :
+
+1. Ship Mode - It has 4 values, they are First Class, Same Day, Second Class and Standard Class. Each value is defines the limit for being delayed as follows: - \
+Same day: >=0 days \
+First class: >=2 days \
+Second class: >=3 days \
+Standard class: >= 5 days \
+
+2. Segment - 
+It is the product sector.There are segments which are Consumer, Corporate and Home Office
+
+3. Country - 
+This column contains the country details. It was found to be only for United States i.e one value. Hence this column can be removed.
+
+4. City - 
+Various Cities present in United States.There are about 531 cities.
+
+5. State - 
+There are 49 states in this dataset.
+
+6. Postal Code - 
+There are 631 postal codes in this dataset
+
+7. Region - 
+There are 4 regions in the dataset. i.e. South, West, Central and East
+
+8. Category - 
+There are 3 categories, they are Furniture, Office Supplies and Technology.
+
+9. Sub-Category - 
+There are 17 sub-categories, some of them are - Bookcases, Chairs, Labels, Tables, Storage, Furnishings, Art, Phones, Binders, Appliances, Paper, Accessories, Envelopes, Fasteners, Supplies, Machines, Copiers
+
+10. Order Date :-
+There are about 1237 unique order dates, but overall from unique year and orders placed each year it seems to be increasing each year from time span starting from 2014 to 2017
+
+```{r}
+order_year_from_date <- Superstore_data |> mutate (year_order = year(Superstore_data$Order.Date) ) |>
+                        group_by(year_order) |>
+                        summarise(yearly_total_orders =n())
+unique(order_year_from_date)
+```
+  
+
+11. Order ID :- Unique orders placed for the column - Order ID
+```{r}
+n_distinct(Superstore_data$Order.ID)
+```
+12. Ship Date  :- 
+There are about 1334 unique ship dates, but overall from unique year, orders placed and shipped each year it seems to be increasing each year from time span starting from 2014 to 2017
+
+```{r}
+
+order_year_from_date <- Superstore_data |> mutate (ship_order = year(Superstore_data$Ship.Date) ) |>
+                        group_by(ship_order) |>
+                        summarise(yearly_total_shipped_orders =n())
+unique(order_year_from_date)
+```
+
+
+13. Customer ID & 14. Customer Name :-
+There are 793 customers in the Superstore dataset. Count of Customer.ID and Customer.Name match i.e. 793, which states that data is not having issues.Because each Customer ID / Name is unique.
+
+15. Product Name & 16. Product ID :-
+1862 Unique Products are purchased in the orders placed, this can be figured from the unique id of each.
+
+17. Sales - 
+It is the price. Having a range starting from $0.444 to $22638.480
+
+18. Profit - 
+It is the profit earned from the product. Can also indicate loss with a negative sign. Having a range -6599.978 to 8399.976
+
+19. Discount - 
+Discount given for the product purchased, range starts from 0 to 0.8. 
+
+20. Quantity - 
+The quantity of products bought, range starts from 1 to 14.
+
+
+------------
+
+
+#### Exploratory Analysis
+
+1. State -
+
+As it was seen above, there are about 49 states, plotting them all to understand the count of purchase is pretty difficult. Hence narrowing it down to top 10 states. Figuring out which state has the most purchases.
+
+It would answer the question -> which are the top 10 states that have purchased the products from the Superstore?
+
+```{r}
+state_count<- aggregate(Superstore_data$State,by=list(Superstore_data$State), FUN=length)
+
+top_10_states_count <-state_count %>%
+arrange(desc(x)) %>%
+    slice(1:10) %>%
+  rename (
+    state=Group.1,
+    count=x
+  )
+top_10_states_count
+
+```
+
+
+```{r}
+top_10_states_count |>
+  ggplot(mapping = aes(x=state, y=count, fill=state)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90))
+
+```
+2. Check sales for each state, if the trend for sales is same as the state?
+
+```{r}
+state_sales_sum<- aggregate(Sales ~ State, data = Superstore_data , FUN=sum)
+
+top_10_states_sum <-state_sales_sum %>%
+arrange(desc(Sales)) %>%
+    slice(1:10) %>%
+  rename (
+    State= State,
+    Total_sales=Sales
+  )
+top_10_states_sum
+
+```
+```{r}
+top_10_states_sum |>
+  ggplot(mapping = aes(x=State, y=Total_sales, fill=State)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90))
+```
+From above plot and value of total sales, can see that it is similar to count of products sold.
+California has the most sales (457687.63), followed by New York (310876.27), then Texas (170188.05) and so on.
+
+```{r}
+Superstore_data_California <- Superstore_data %>%
+  filter(State == 'California')
+Superstore_data_California
+```
+
+```{r}
+
+# time series toolkits
+library(xts)
+library(tsibble)
+
+Superstore_data_ <- Superstore_data |>
+  select(Order.Date, Sales) |>
+  distinct() |>
+  arrange(Order.Date) |>
+rename(
+    Order_date = Order.Date,
+    Sales = Sales
+  )
+
+head(Superstore_data_)
+```
+
+```{r}
+Superstore_data_ts <- as_tsibble(Superstore_data_, index=Order_date) |>
+  index_by(Order_date = date(Order_date)) |> # index_by() similar to group_by()
+  summarise(total_sales = sum(!is.na(Sales))) |> # n() not being used because we assume that certain value is not present i.e. mag is not , 
+  fill_gaps() # fill implicit missing values (16th jan to 18th jan, 17th jan doesnt exist) - index needs to have continuity, otherwise errors might be issue. 
+
+head(Superstore_data_ts)
+```
+

@@ -1,0 +1,321 @@
+# Ethics and Epistemology
+
+The issues of ethics and epistemology in statistics are better understood abstractly, and not necessarily by code. However, there are a few ways to combat some of the issues, which we'll discuss here. The basic ideas discussed in lecture for this week will be expanded on and applied to later lessons.
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+```
+
+## Class Imbalance
+
+Let's look at a simple example of class imbalance. Suppose our "model" is simply using the mean (average) to estimate the value of some variable for a population.
+
+-   According to [ABStaffing](https://www.abstaffing.com/male-nursing-statistics/#:~:text=Overall%2C%20throughout%20all%20states%2C%20out,as%20nurses%20in%20each%20state.), there are 9 females for every 1 male nurse in the U.S.
+-   According to a bit of Google searching, it looks like the average length of female hair is about 14 inches, and for male hair it's about 3 inches.
+-   Suppose we synthesize a dataset of 100 *made-up* nurses, logging their gender and their hair length (assuming the length is normally distributed with a standard deviation of about 3 inches).
+
+```{r}
+# a data frame of *made-up* nurses
+nurses <- tibble(
+  hair_length = abs(round(c(rnorm(90, 14, 3), 
+                            rnorm(10, 3, 3)))),
+  gender = c(rep("f", 90), rep("m", 10))
+)
+```
+
+The average hair length for all of these seems to be agreeable when we look at the data in aggregate.
+
+```{r}
+avg_length <- mean(nurses$hair_length)
+
+nurses |>
+  ggplot() +
+  geom_jitter(mapping = aes(x = hair_length, y = "all data"), 
+              shape = 1, size = 3, width=0, height=0.1) +
+  geom_vline(mapping = aes(xintercept = avg_length,
+                           color = "Average Hair Length")) +
+  labs(title = "Made-Up Data for Nurse Hair Length", 
+       colour = "",
+       x = "hair length", y = "") +
+  theme_hc()
+```
+
+But, when we break up the data by gender, we notice an imbalance.
+
+```{r}
+avg_length <- mean(nurses$hair_length)
+avg_lengths <- nurses |> 
+  group_by(gender) |> 
+  summarize(avg_hair = mean(hair_length))
+
+nurses |>
+  ggplot() +
+  geom_jitter(mapping = aes(x = hair_length, y = gender), 
+              shape = 1, size = 3, width=0, height=0.1) +
+  geom_point(data = avg_lengths,
+             mapping = aes(x = avg_hair, y = gender),
+             shape = "|", size = 12, color = "orange") + 
+  geom_vline(mapping = aes(xintercept = avg_length,
+                           color = "Average Hair Length")) +
+  labs(title = "Made-Up Data for Nurse Hair Length", 
+       colour = "",
+       x = "hair length", y = "gender") +
+  theme_hc()
+```
+
+Here, the "global" average (the red line) is much closer (or, representative) of the average for females than it is for males. Now, suppose we use a weighted average, weighing each row of data proportionally to the prevalence of their gender. I.e., male rows will have a weight of 9 and female rows a weight of 1.
+
+```{r}
+# suppose we weigh each row proportionally
+nurses <- nurses |>
+  mutate(gender_weight = ifelse(gender == "m", 9, 1))
+
+# global weighted average
+avg_length_w <- weighted.mean(nurses$hair_length,
+                              nurses$gender_weight)
+
+# averages for each gender
+avg_lengths <- nurses |> 
+  group_by(gender) |> 
+  summarize(avg_hair = mean(hair_length))
+
+nurses |>
+  ggplot() +
+  geom_jitter(mapping = aes(x = hair_length, y = gender), 
+              shape = 1, size = 3, width=0, height=0.1) +
+  geom_point(data = avg_lengths,
+             mapping = aes(x = avg_hair, y = gender),
+             shape = "|", size = 12, color = "orange") + 
+  geom_vline(mapping = aes(xintercept = avg_length_w,
+                           color = "Weighted Average Hair Length (9-1)")) +
+  labs(title = "Made-Up Data for Nurse Hair Length", 
+       colour = "",
+       x = "hair length", y = "gender") +
+  theme_hc()
+```
+
+There are a couple of caveats to this calculation:
+
+-   There *are* more female than male nurses, so a weighted average is not an accurate depiction of the population as we know it. Thus, this kind of calculation should likely only be presented (or used) along with the global average, not alone.
+-   Maybe there will be a day when the distribution of nurses is more or less equal between males and females. It is this alternate reality which drives conclusions drawn from calculations like the one above. (E.g., "if there were just as many male nurses as female nurses, we could expect hair length to tend toward $\bar{x}$.")
+
+## Outliers
+
+There are many ways to detect outliers, but **we should always select (or build) the best method based on the data and our context**. Again, you can design your own method for defining an outlier, so long as you have support for your design.
+
+### Interquartile Range (IQR)
+
+When plotting `geom_boxplot`, the default length of the whiskers is $1.5 \times \text{IQR}$. If the data lies within that range, then it is represented as "a part of" the whisker line. Otherwise, it shows up as a point past the line. These are considered "outliers".
+
+```{r}
+mpg |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = cty, y = "")) +
+  labs(title = "City Mileage from mpg data",
+       x = "city mileage", y = "") +
+  theme_classic()
+```
+
+We can annotate these points using a combination of `filter` and `geom_text_repel`, which comes from the *ggrepel* package.
+
+```{r}
+mpg |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = cty, y = "")) +
+  geom_text_repel(data = filter(mpg, cty > 27),
+                  mapping = aes(x = cty, y = "", label = model),
+                  color = "darkred") +
+  labs(title = "City Mileage from mpg data",
+       x = "city mileage", y = "") +
+  theme_classic()
+```
+
+### Percentile
+
+If a value is in a very high (or very low) percentile of the data, it might indicate that it's an outlier.
+
+```{r}
+percentiles <- c(quantile(mpg$cty, 0.01),
+                 quantile(mpg$cty, 0.99))
+mpg |>
+  ggplot() +
+  geom_jitter(mapping = aes(x = cty, y = ""),
+              width = 0, height = 0.1) +
+  geom_vline(mapping = aes(xintercept = percentiles["1%"],
+                           color = "2% percentile")) +
+  geom_vline(mapping = aes(xintercept = percentiles["99%"],
+                           color = "98% percentile")) +
+  labs(title = "City Mileage from mpg data",
+       x = "city mileage", y = "", colour = "") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_classic()
+```
+
+### Gaps in the Data
+
+If we plot a histogram, often there are noticeable gaps we can use as a guide for telling us whether there are outliers.
+
+```{r}
+mpg |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = cty), color = "white", 
+                 fill = "#3182bd") +
+  labs(title = "City Mileage from `mpg` Data",
+       x = "City Mileage", y = "") +
+  theme_classic()
+```
+
+When we look at this histogram, and we see the gap between those outliers we saw earlier and the bulk of the data, we can decide whether they are far enough away to be called an outlier. It might depend on the use-case.
+
+*Note: Sometimes when the outliers are far enough, you might need to use a logarithmic scale to see them clearly.*
+
+### Based on Groups
+
+We can also define an outlier based on the group of data that it's in. For example, if we just look at the city mileage for these cars *based on* their class, we may see that some cars are significantly different compared to others in their group.
+
+```{r}
+mpg |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = cty, y = class)) +
+  geom_text_repel(data = filter(mpg, (cty > 25) & (class == "compact")),
+                  mapping = aes(x = cty, y = class, label = model),
+                  color = "darkred") +
+  labs(title = "City Mileage by Class",
+       x = "city mileage", y = "Class") +
+  theme_classic()
+```
+
+Notice here that the corollas in the "compact" class might not be outliers per se for the "subcompact" class.
+
+### EXERCISE
+
+Take a look at the `diamonds` dataset. Are there outliers in this data set? Why or why not? Try to visualize your reasoning.
+
+```{r}
+unique(diamonds$cut)
+unique(diamonds$color)
+
+unique(diamonds$depth)
+```
+
+```{r}
+diamonds |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = table, y = cut)) +
+  #geom_text_repel(data = filter(diamonds, (table > 70) ),
+  #                mapping = aes(x = table, y = cut, label =color),
+  #                color = "darkred") +
+  labs(title = "Table by Cut",
+       x = "Table", y = "Cut") +
+  theme_classic()
+
+```
+
+```{r}
+diamonds |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = price, y = cut)) +
+  #geom_text_repel(data = filter(mpg, (depth > 25) & (class == "compact")),
+   #               mapping = aes(x = cty, y = class, label = model),
+  #                color = "darkred") +
+  labs(title = "Price by Cut",
+       x = "Price", y = "Cut") +
+  theme_classic()
+
+
+```
+
+```         
+carat 
+```
+
+## Missing Data
+
+### Types of Missing Data
+
+```{r}
+foods <- tibble(
+  food = c("asparagus", "celery", "chicken", "oatmeal"),
+  group = c("veggie", "veggie", "meat", "grain"),
+  calories = c(100, NA, 300, 50),
+  survey_year = c(2019, 2020, 2022, 2023),
+  survey_is_tasty = c("yes", "yes", "yes", "yes"),
+)
+
+foods
+```
+
+We have **Explicit** missing values in the *calories* column, **Implicit** missing rows indicated by the *survey_year* column, and **Empty Groups** illustrated in the last *survey_is_tasty* column.
+
+### (Not) Estimating Missing Data
+
+**We do not estimate missing values when performing inferential statistics.** Estimating these missing values is only valuable when building predictive models. In those cases, some methods include [interpolation](https://www.statology.org/r-interpolate-missing-values/), imputation (e.g., [MICE](https://cran.r-project.org/web/packages/miceRanger/vignettes/miceAlgorithm.html)), [back/forward filling](https://r4ds.hadley.nz/missing-values#last-observation-carried-forward), or simply [filling](https://r4ds.hadley.nz/missing-values#fixed-values) `NA` cells with known values (such as the average value in a group).
+
+In the case of inferential statistics, we don't want to invalidate *any* aspect of our interpretation, so we instead set our scope, or explain why we don't include missing values in an analysis.
+
+### Dealing with Missing Data: Set Scope
+
+Sometimes, missing values correlate with another column of data. For example, consider the *ozone* column of the `airquality` dataset.
+
+```{r}
+airquality |>
+  mutate(ozone_is_na = is.na(Ozone)) |>
+  ggplot() +
+  geom_bar(mapping = aes(x = Month, fill = ozone_is_na)) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(title = "Missing Values by Month for Air Quality Dataset",
+       y = "Number of Rows",
+       fill = "Missing Ozone?") +
+  theme_classic()
+```
+
+In these cases, maybe we relegate our analysis to the months that do have more data. E.g., *"In this analysis, we focus on the months of July-September, where there are more data available."*
+
+Then, you might use `filter`, etc.
+
+### Dealing with Missing Data: Fill based on documentation
+
+Use `View(airquality)` to see that data, and take a look at the *Solar.R* column. According to the documentation, this is the *Solar radiation in Langleys in the frequency band 4000--7700 Angstroms from 0800 to 1200 hours at Central Park*.
+
+We don't know what a missing value for that column means, so it might involve contacting the curator of the data to find out. For example, it could mean that the solar radiation was *purposely* not measured (e.g., bad weather, the measurement equipment wasn't working, etc.). Either way, a good start is to make a new column indicating these missing values, if we're interested in them.
+
+```{r}
+airquality |>
+  mutate(radiation_measured = !is.na(Solar.R)) |>
+  ggplot() +
+  geom_point(mapping = aes(x = Temp, y = Wind,
+                           color = radiation_measured),
+             shape = 1) +
+  scale_color_brewer(palette = "Set1") +
+  labs(color = "Solar.R Measurement Exists") +
+  theme_minimal() +
+  theme(legend.position="bottom")
+```
+
+We don't see anything indicating that wind or temperature affect whether or not the radiation were measured, so maybe those variables have nothing to do with the issue.
+
+### Calculating Aggregate Values
+
+R is very finicky when it comes to calculating things like averages with missing data:
+
+```{r}
+mean(airquality$Ozone)
+```
+
+When we want to do such a thing, if it's applicable, we need to specify not to include missing values with the `na.rm` (or, "NA remove") argument. This is a good thing, because **it keeps you from assuming that the average applies to all rows!**
+
+So, to calculate the average for a column containing missing values, we use `na.rm`, and we indicate how many missing values there are, for context.
+
+```{r}
+airquality |>
+  group_by(Month) |>
+  summarize(avg_ozone = mean(Ozone, na.rm = TRUE),
+            n_rows = n(),
+            n_missing = sum(is.na(Ozone)))
+```
+
+## EXERCISE
+
+Using the `airquality` data, how would you plot the relationship between the Ozone and Solar.R? How would you document your analysis?

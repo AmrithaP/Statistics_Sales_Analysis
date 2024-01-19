@@ -1,0 +1,699 @@
+# The Central Limit Theorem
+
+-   Random variables
+-   Probability Functions
+    -   Probability mass function
+    -   probability density function
+    -   Cumulative distribution function
+-   Theoretical Distributions
+    -   Discrete
+    -   Continuous
+-   Empirical Distributions
+    -   Discrete
+    -   Continuous
+-   The Sampling Distribution
+    -   Sampling
+    -   Central Limit Theorem
+    -   Normality
+        -   Z-score
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+```
+
+## Random Variables
+
+In the last class, we discussed the theoretical notion of **probability**, and a few different ways it can be calculated. Before that, we discussed **data** and its attributes. Probability and data form the basis for statistics, and the connection between them is the Random Variable.
+
+Let's revisit flipping a coin. The act of flipping a coin is a natural process with an element of randomness, and it can take on one of two events in an event space, $\{H, T\}$ ("heads" or "tails"). To convert non-numeric events like these into numbers we can compute, we can define a random variable $X$ such that $X = 1$ when the flip is "heads", and $X = 0$ when the flip is "not heads", or "tails". This process of mapping a natural phenomenon to a numerical value is at the heart of the random variable.
+
+**The Random Variable** $X$ **is a numeric representation for the possible events of a natural phenomenon.**
+
+### EXERCISE
+
+Let's consider the act of going fishing in Eagle Creek. For example, after some time, we might not catch any fish. If we wait a little longer, maybe we catch one! And, so on ...
+
+1.  Define and explain a (numeric) random variable that captures this phenomenon. Catching a fish : 1 Not catching a s fish : 0
+
+2.  Try to come up with a framework that describes probabilities for all possible outcomes of the random variable. ANS :
+
+3.  x=catching a fish or not , with time beinf indefinite time, summation over them would give the probability within that entire time frame
+
+4.  t= every hr, how many fishes I catch in that hour?
+
+5.  t= some hr, how mnay fishes have I caught so far?
+
+*Hint: different situations might call for adjustments to the framework.*
+
+### Expected Value
+
+Since $X$ represents all possible events for a natural phenomenon, we can assign a probability to each value $X$ can take on. So, for example, if our event space consists of all possible rolls of a dice $\{1, 2, 3, 4,5 ,6\}$, we will have $P(X = x) = \frac{1}{6}$ for all values $X = x$. Further, given a random variable's probabilities, we can calculate an estimation for the value we *expect* a random variable to take on. **Our best estimation for a random variable is encapsulated in its Expected Value.**
+
+The **Expected Value** for a (discrete) random variable is the sum of each outcome $X=x$ *weighed* by its probability:
+
+$$
+E[X] = x_1P(X = x_1) + x_2P(X = x_2) + \cdots + x_nP(X = x_n) = \sum_{i = 1}^nx_iP(X = x_i)
+$$
+
+### EXERCISE
+
+Write a function that calculates the expected value for a random variable, given two arguments as input:
+
+-   `event_space` : contains all possible (numeric) random variable values
+-   `probs` : contains all probabilities associated with each value in `event_space`
+
+Then, try it out on a few random situations. Try to write the function so that `probs` could be either a vector *or* a scalar.
+
+```{r}
+print("your code here")
+
+expected_value <- function(event_space, probs) {
+  
+  e <- event_space*probs
+  
+  return (sum(e)) 
+  
+}
+
+# Dice Example
+event_space <- c(1:6)
+probs <- c(1/6, 1/6, 1/6, 1/6, 1/6, 1/6)
+
+cat("Events:",event_space,"\n")
+cat("Probability",probs,"\n")
+
+cat("Expected value",expected_value(event_space,probs))
+
+```
+
+*(bonus) How can might we calculate the expected value for a continuous random variable?*
+
+## Probability Functions
+
+In statistics, we are particularly interested in the probability associated with each possible value that $X$ could take on. Since $X$ is always numeric (by design), we can create a coordinate plane with the random variable $X$ on the x-axis, and probability represented on the y-axis. The result of this system is called a **probability function**.
+
+Since $X$ can be discrete or continuous, there are then two different kinds of probability functions: one for discrete random variables called the **probability mass function**, and one for continuous random variables called the **probability density function**.
+
+> Note: always keep in mind that *probability is theoretical*. It is a tool to help us understand the natural world, but it's never perfect.
+
+### Probability Mass Function
+
+The Probability Mass Function (or, PMF) is a function $f$ of the different values $x$ that $X$ can take on, and $f(x)$ *is* the probability that the random variable $X = x$. For example, if we're looking at rolling a dice, then we have a PMF such that $f(x) = 1/6$ for all six $X=x$ values. In this way, the PMF can be represented as a sort of step function on the x-y plane, or it could actually just be a table of values.
+
+The two main properties of a PMF are:
+
+1.  $f(x) > 0$ (strictly), for *all* $x$ in the event space, and $f(x) = 0$ otherwise.
+
+2.  $\sum_x{f(x)} = 1$. That is, the *sum* of all the probabilities a random variable could take on is equal to 1.
+
+Let's return to rolling dice as a simple example:
+
+```{r}
+library(tidyverse)
+ggplot() +
+  geom_segment(mapping = aes(x = 1:6, y = 0, xend = 1:6, yend = 1/6)) +
+  geom_point(mapping = aes(x = 1:6, y = 1/6)) +
+  scale_y_continuous(breaks = c(0, 1/6, 1/3), 
+                     labels = c("0", "1/6", "1/3"),
+                     limits = c(0, 1/3)) +
+  labs(title = "PMF for Rolling Dice",
+       x = "# of dots on the dice",
+       y = "Probability of Dice Roll") +
+  theme_minimal()
+```
+
+This distribution follow both of the conditions above, and it's immediately clear that we can use it *directly* to calculate the (theoretical) probability of any particular dice roll, e.g., $f(4) = 1/6$.
+
+### Probability Density Function
+
+If $X$ is continuous, then there are *infinitely* many values it can take on. If we want to create a continuous probability function which follows the same sort of properties as a PMF, then we need the "sum" of all its probabilities to be exactly 1. The only way to sum infinitely many probabilities, and still get a non-infinite value, is if all the probabilities are infinitesimally small (essentially, zero). So, instead of building a function around the probability of an individual point $P(X = x)$ (which, is technically zero), we concern ourselves with the probability that $X$ lies within a range ...
+
+The Probability *Density* Function (or, PDF) is a function $f$ of the different values $x$ that $X$ can take on, and the area under the curve between $a$ and $b$ represents the probability that the random variable $X = x$ lies somewhere between $a$ and $b$. Keeping integral calculus out of the question, we can think if $f(x)$ as the "density" of possible values in the neighborhood of $x$.
+
+For example, let's return to our fishing example, and define our random variable $X$ to be the expected time between two catches. If we don't know anything about how many catches you've had (or, how many you're going to have), we would probably conclude a density function that has an exponential decay, like the one below.
+
+```{r}
+x1 <- seq(0.5, 1.5, length.out = 200)
+y1 <- dexp(x1)
+
+x2 <- seq(2.5, 3.5, length.out = 200)
+y2 <- dexp(x2)
+
+ggplot() +
+  geom_area(mapping = aes(x = x1, y = y1), fill = "lightblue") + 
+  geom_area(mapping = aes(x = x2, y = y2), fill = "pink") + 
+  geom_function(xlim = c(0, 5), fun = dexp) +
+  geom_vline(mapping = aes(xintercept = c(0.5, 1.5)), 
+             linetype = "dashed", color = "gray") +
+  geom_vline(mapping = aes(xintercept = c(2.5, 3.5)), 
+             linetype = "dashed", color = "gray") +
+  labs(title = "PDF for Time Between Fish Catches",
+       x = "Hours since last catch",
+       y = "Probability Density") +
+  theme_minimal()
+```
+
+When we look at PDF plots, we're looking for the "bulk" of the distribution. In this case, the bulk of the area is concentrated on the left side. So, maybe you're more likely to have caught a fish about an hour then you are to have been waiting 3 hours in between catches.
+
+> *Note: **The values on the y-axis do not translate to probabilities**. Rather, they should be thought of as "relative densities", used to compare one probability neighborhood to another.*
+
+### Cumulative Distribution Function
+
+The PDF is specifically designed for theoretical calculations on continuous random variables, but practically it only helps to give us a visual *intuition* for its attributes. E.g., without integral calculus, we cannot calculate the area of the regions above. The Cumulative Distribution Function (CDF) is a function $F(x)$ which provides a *direct* calculation for the probability a random variable will be between $0$ and $x$. With it, we can also calculate $F(b) - F(a)$, or the probability a random variable will be between $a$ and $b$. Even further, CDFs exist for both continuous *and* discrete variables.
+
+Continuing with the fishing example, we create a CDF which cumulatively sums the probabilities of the exponential PDF (above) over the values of $X$:
+
+```{r}
+ggplot() +
+  geom_function(xlim = c(0, 5), fun = pexp) +
+  geom_vline(mapping = aes(xintercept = 2), 
+             linetype = "dashed", color = "gray") +
+  labs(title = "CDF for Time Between Fish Catches",
+       x = "Hours since last catch",
+       y = "Probability") +
+  theme_minimal()
+```
+
+In this case, we can see that almost 90% of the time, the next catch occurs in less than 2 hours. We could also calculate $F(2) \approx 0.875$ and $F(1) \approx 0.625$ to conclude the probability that the next catch will occur in between 1 to 2 hours is $F(2) - F(1) \approx 0.25$.
+
+> *Note: it is tempting, but ignore the area under the CDF, as it doesn't carry any immediately interesting information about probabilities.*
+
+### EXERCISE
+
+Write an R function for the PDF (not PMF) of the random variable $X$, where $X = x$ is a continuous value taken on by a ("perfect") random number generator of values between 0 and 2 (and zero otherwise). Then, plot it for $0 \leq X \leq 5$.
+
+```{r}
+print("your code here ...")
+```
+
+## Theoretical Distributions
+
+As you might have guessed by now, there are likely hundreds of [probability distributions](https://en.wikipedia.org/wiki/List_of_probability_distributions) out there. In this class, we'll only concern ourselves with some of the more common probability distributions found in nature.
+
+> *Note: below, we plot PMFs/PDFs for various probability distributions. In the code, find the function of the curve (or points), and search for it in the Help pane in RStudio. There, you'll find all the associated functions for the distribution (e.g., for randomly selecting values from the distribution, etc.).*
+
+### Uniform Distribution
+
+There is a [discrete version](https://en.wikipedia.org/wiki/Discrete_uniform_distribution) of this, and a [continuous version](https://en.wikipedia.org/wiki/Continuous_uniform_distribution), and both of which you should already have seen above. The discrete uniform distribution has the following definition:
+
+$$
+f(X=x) = \frac{1}{n}, \quad \text{where $n$ is the number of values $X$ can take on}
+$$
+
+And the continuous PDF has a similar definition:
+
+$$
+f(X = x; a, b) = \begin{cases}
+  \frac{1}{b - a},\quad &\text{when $a \leq x \leq b$} \\
+0,\quad &\text{otherwise}
+\end{cases}
+$$
+
+### [Bernoulli Distribution](https://en.wikipedia.org/wiki/Bernoulli_distribution)
+
+A Bernoulli Trial is a singular binary event that has a constant probability of occurring (or not). A straight-forward example of this is the flipping of a coin, and in a way, it is the basis for all discrete probability distributions. We define the PMF for the Bernoulli Distribution as follows:
+
+$$
+f(X = x) = \begin{cases}
+  p,\quad &\text{if $x$ is the target event} \\
+  1 - p,\quad &\text{otherwise}
+\end{cases}
+$$
+
+where the target event (e.g., "heads", or "success") is encoded as $X = 1$, and $X=0$ otherwise. We can map it to the x-y plane, below.
+
+```{r}
+ggplot() +87999888888888888889999999999999999999999999999999999999999999999999999999999999999999999999ppppppppppppppppppppppppppppppppppppppppppppppppp7pp
+  geom_point(mapping = aes(x = 0:1, y = c(0.75, 0.25))) +
+  scale_x_continuous(breaks = c(0, 1),
+                     limits = c(-.5, 1.5)) +
+  scale_y_continuous(breaks = c(0, 0.25, 0.75, 1),
+                     limits = c(0, 1)) +
+  labs(title = "PMF for Bernoulli Distribution",
+       x = "X",
+       y = "Probability") +
+  theme_minimal()
+```
+
+Maybe the above example represents the situation where $X$ is your winning *something* on the Wheel of Fortune (or not).
+
+### [Binomial Distribution](https://en.wikipedia.org/wiki/Binomial_distribution)
+
+Suppose we define a "success" of any Bernoulli Trial as the situation where its random variable is 1. Then, the Binomial Distribution PMF is a function of the random variable $X$ representing the number of successful (i.e., "1") Bernoulli Trials out of $n$ trials. We define it by calculating all the possible ways to choose $k$ successes out of $n$ trials, multiplied by the associated probabilities of each success or failure.
+
+$$
+f(X = k; n, p) = {\displaystyle {\binom {n}{k}}p^{k}(1 - p)^{n - k}}
+$$
+
+Most distributions (this one included) require a few **parameter** values to fully define the distribution. In this case, we have the probability associated with a single trial $p$, and the number of trials taken $n$. An example of this would be the situation where the random variable $X$ is the number of wins at a slot machine after $n$ trials.
+
+```{r}
+n <- 40
+p <- 0.2
+x <- 0:30
+y <- dbinom(x, size = n, prob = 0.2)
+params <- "(n = 40, p = 0.2)"
+
+ggplot() +
+  geom_segment(mapping = aes(x = x, y = 0, xend = x, yend = y)) +
+  geom_point(mapping = aes(x = x, y = y)) +
+  labs(title = paste("PMF for Binomial Distribution", params),
+       x = "# of successes out of n trials",
+       y = "Probability") +
+  theme_minimal()
+```
+
+Maybe this is a really lucrative slot machine ...
+
+### [Geometric Distribution](https://en.wikipedia.org/wiki/Geometric_distribution)
+
+The Geometric Distribution is concerned with the very *first* success of a series of Bernoulli trials. That is, we are looking at all probabilities of the random variable $X$ which represents the number of *independent* Bernoulli trials before the first success. We can define the probability mass function $f$ given some probability $p$ associated with the Bernoulli trials.
+
+$$
+f(X = k; p) = (1-p)^{k-1}p
+$$
+
+This makes sense, because we're looking at the probability of a string of non-successes (hence the first term in the product, $(1-p)^{k-1}$) then one success which has probability $p$.
+
+```{r}
+x <- 0:8
+y <- dgeom(x, prob = 0.5)
+params <- "(p = 0.5)"
+
+ggplot() +
+  geom_segment(mapping = aes(x = x, y = 0, xend = x, yend = y)) +
+  geom_point(mapping = aes(x = x, y = y)) +
+  labs(title = paste("PMF for Geometric Distribution", params),
+       x = "# of Bernoulli Trials to Success",
+       y = "Probability") +
+  theme_minimal()
+```
+
+with this example, we have $p=0.5$, so a great analog here would be the flipping of a coin, and these numbers at least line up with my intuition on how long it would take for me to get a heads.
+
+### [Poisson Distribution](https://en.wikipedia.org/wiki/Poisson_distribution)
+
+Consider an event which occurs periodically, e.g., rain, catching a fish in the ocean, a dog walking by, etc. Then, the Poisson Distribution expresses the probability that event occurs $k$ times in a fixed interval of time or space under the following conditions:
+
+1.  The average rate of the event is constant
+2.  Each occurrence is independent of the last
+
+These conditions define a "Poisson Process" or "Poisson Point Process".
+
+> *So, for example, if you are fishing in a pond with a fixed number of fish, and you do not return the fish back to the water, this distribution would likely **not** accurately represent the random variable for the number of fish you catch in any interval of time. (Why?) Also, "poisson" is "fish" in French ...*
+
+Think of the Poisson Distribution as a "count" distribution, associated with an invisible observer with a metal counter device in their hand, logging each time an event occurs over time period $t$.
+
+$$
+P(X = k) = {\frac {\lambda^{k}e^{-\lambda}}{k!}}, \quad \text{where $\lambda = rt$}
+$$
+
+In this case, $r$ is the (constant) *average* rate the event occurs, independent of whether it has already occurred.
+
+```{r}
+x <- 0:20
+y <- dpois(x, lambda = 5)
+params <- "(lambda = 5)"
+
+ggplot() +
+  geom_segment(mapping = aes(x = x, y = 0, xend = x, yend = y)) +
+  geom_point(mapping = aes(x = x, y = y)) +
+  labs(title = paste("PMF for Poisson Distribution", params),
+       x = "# of event occurences after time t",
+       y = "Probability") +
+  theme_minimal()
+```
+
+For example, we could be sitting outside on our porch, watching cars go by. On average, a car will go by once every 20 minutes, or 5 cars every hour. So, if we set our unit of time to be one hour $t=1$, and the average rate to be $r=5$, then $\lambda = 5\cdot 1 = 5$, and we have the above distribution. This makes sense; I think it would be very rare to see 15 cars go by in an hour (in this case), but more likely that only 1 car would go by in the hour.
+
+### [Exponential Distribution](https://en.wikipedia.org/wiki/Exponential_distribution)
+
+We've actually already seen an example of this, but the Exponential Distribution is a *continuous* distribution, concerned with the time interval between events in a Poisson Process. As we should expect, the PDF for the Exponential Distribution very closely resembles the Poisson PMF:
+
+$$
+f(X = t; r) = 
+\begin{cases}
+  r e^{-r t} & t \geq 0, \\
+  0 & t < 0.
+\end{cases}
+$$
+
+where $r$, again, is the average rate of the event, and $t$ is the time between that event and the last (or the next).
+
+```{r}
+ggplot() +
+  geom_function(xlim = c(0, 1.5), fun = function(x) dexp(x, rate = 5)) +
+  labs(title = "PDF for the Exponential Distribution (rate = 5)",
+       x = "Time to next event",
+       y = "Probability Density") +
+  theme_minimal()
+```
+
+If we again use the example of cars driving past our porch with a rate of $r = 5$ cars per hour, the plot above represents the probability density of the time between each car driving by. So, after seeing one car drive by, it's much more likely you'll see another in around 10 minutes then the likelihood you'll have to wait another hour.
+
+### [Normal (Gaussian) Distribution](https://en.wikipedia.org/wiki/Normal_distribution)
+
+Above, we've listed the most common probability distributions you'll find in statistics and data science in general. You may have also noticed that it's usually not too difficult to see how their PDFs/PMFs relate to the probabilities of their associated random variable(s). **The Normal/Gaussian Distribution** or "**Bell Curve"**, on the other hand, is not concerned with prescribed probabilities for a specific type of random variable per se, but rather it expresses the **central tendency** of *any* random variable if we experiment with it enough times:
+
+$$
+f(X = x; \mu, \sigma) = \frac {1}{\sigma {\sqrt {2\pi }}} e^{-{\frac {1}{2}}\left({\frac {x-\mu }{\sigma }}\right)^{2}}
+$$
+
+Here, our parameters are a bit more subtle than something like rate or the number of sides of a coin. Instead, suppose we collect some numeric data (at least one observation) on a phenomenon or entity (say, the temperature of a classroom on campus), and then we measure it again on another day, and again, and so on. We will eventually find that those numbers will change from one to the next, but they will *tend* to be concentrated around a *central* value. Here, we have the following parameters:
+
+-   $\mu$ is the (theoretical) "true" parameter value for the phenomenon or entity of our observations
+-   $\sigma$ is a measure of dispersion called the "standard deviation". It measures the amount to which our measurements stray from $\mu$.
+
+```{r}
+ggplot() +
+  geom_function(xlim = c(50, 90), 
+                fun = function(x) dnorm(x, mean = 70, sd = 5)) +
+  labs(title = "PDF for the Normal Curve (mu = 70, sd = 5)",
+       x = "Estimated Value for mu",
+       y = "Probability Density") +
+  theme_minimal()
+```
+
+Above, we could say (for example) that $X$ is the random variable defined by all possible observations of classrooms on campus, and our measurement(s) of their temperature. The bulk of the area under the curve is concentrated in the center. So, temperatures that stray far from $\mu$ are much less likely than those closer to it.
+
+### Other Distributions
+
+Below are a few other distributions that you can expect to encounter in this class (and in data science work in general). We do not discuss them here simply because they only make sense in the context of particular situations (e.g., very specific hypothesis tests). Further, the random variables which defines them are usually quite niche.
+
+-   [Weibull Distribution](https://en.wikipedia.org/wiki/Weibull_distribution#:~:text=In%20probability%20theory%20and%20statistics,spends%20on%20a%20web%20page.)
+-   [F Distribution](https://en.wikipedia.org/wiki/F-distribution)
+-   [Chi-Squared Distribution](https://en.wikipedia.org/wiki/Chi-squared_distribution)
+-   [Student's t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution)
+-   [Beta Distribution](https://en.wikipedia.org/wiki/Beta_distribution)
+
+## Empirical Distributions (Ames)
+
+Of course in practice, our data typically only approximate these theoretical distributions, and we can only hypothesize which is best fit. Let's explore the [Ames Housing Dataset](http://ww2.amstat.org/publications/jse/v19n3/decock.pdf) (using its [documentation](https://jse.amstat.org/v19n3/decock/DataDocumentation.txt)) to help illustrate some examples of empirical distributions, and we'll pick up some more vocabulary regarding distributions along the way.
+
+```{r}
+library(AmesHousing)
+
+ames <- make_ames()  # see docs
+```
+
+### Sales Price
+
+The first variable we'll take a look at is the Sales Price. This is a dollar amount that is always greater than zero.
+
+```{r}
+ames |> 
+  ggplot() +
+  geom_histogram(mapping = aes(x = Sale_Price),
+                 colour='white')# +
+ # theme_hc()
+```
+
+The price is always greater than 0, and the bulk of the data is concentrated on the left side of the distribution. Also, there is a relatively long tail to the right. This looks a lot like a Poisson Distribution. A few terms we can pick up from this plot:
+
+-   **skew** - the long "tail" to the right *skews* the mean of this distribution to the right of the median. We call this a **right skew**. Analogously, you can imagine what left-skewed data would look like.
+
+### EXERCISE
+
+In the cell below, build a vector of 10 values whose distribution is *skewed* to the left, or "left-skewed". Verify this by plotting it.
+
+```{r}
+print("your code here ...")
+```
+
+### Masonry Veneer
+
+According to the documentation, the "masonry veneer" for a home could come in one of multiple types: Brick Common, Brick Face, Cinder Block, None, or Stone. The `Mas_Vnr_Area` is a continuous measure of the masonry veneer *area* in square feet.
+
+```{r}
+ames |> 
+  ggplot() +
+  geom_histogram(mapping = aes(x = Mas_Vnr_Area),
+                 colour='white') #+
+#  theme_hc()
+```
+
+When we first plot this, we see that there is an overwhelming number of houses with **zero** masonry veneer. This sort of thing is common when there is a continuous element of something that is "optional", of sorts. We call this a **Zero-Inflated** **Distribution**, and in particular, this looks like a Zero-Inflated Poisson Distribution. It becomes more apparent when we remove the zeros from our plot:
+
+```{r}
+ames |> 
+  filter(Mas_Vnr_Area > 0) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = Mas_Vnr_Area),
+                 colour='white') +
+  theme_hc()
+```
+
+*(What are some different ways to overcome this phenomenon?)*
+
+### Year Built/Remodeled
+
+When we look at the years each house was built, we see an increasing amount of houses being built over time. This doesn't quite match up with any of the probability distributions we've seen above, but we can make a quick adjustment so that it's close to one (you might have an idea for what this transformation might be).
+
+```{r}
+ames |> 
+  ggplot() +
+  geom_histogram(mapping = aes(x = Year_Built),
+                 colour='white') #+
+#  theme_hc()
+```
+
+```{r}
+ames |> 
+  mutate(Age_of_Build = year(now()) - Year_Built) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = Age_of_Build),
+                 colour='white') +
+  theme_hc()
+```
+
+Now we can see a *roughly* exponential decay, aligning with our notion for the Exponential Distribution. In a way, this makes sense since (under the circmstances) we might expect that a random house in Ames is more likely to be built recently than a long time ago.
+
+Another interesting calculation we might consider is the difference between the `Year_Built` and the `Year_Remod_Add` (the time between being built and remodeled) for remodeled homes. Now, according to the documentation, the `Year_Remod_Add` is equal to the `Year_Built` if there was no remodeling or addition. So, for our scope of only remodeled homes, we'll remove those from the sample before plotting. *(What might we see if we don't do this, especially if there are many cases of non-remodeled homes?)*
+
+```{r}
+ames |>
+  filter(Year_Remod_Add > Year_Built + 1) |>
+  mutate(Time_to_Remod = Year_Remod_Add - Year_Built) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = Time_to_Remod),
+                 colour='white') +
+  theme_hc()
+```
+
+How would you characterize this distribution?
+
+### Latitude
+
+It's true, latitude and longitude data are typically visualized on a map projection, but it's also possible to analyze the numbers themselves.
+
+```{r}
+ames |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = Latitude),
+                 colour='white') +
+  theme_hc()
+```
+
+In the above histogram, we see two "bunches" of data; one beneath the \~42° latitude and one above. We call this distribution **bi-modal**, and you can think about it as one which contains two "clusters" of data. In this case, with latitude, maybe there is a sort of buffer separating the "northern" neighborhoods from the "southern" neighborhoods. *(What are some things we can do with clusters of data like this?)*
+
+### Lot Area
+
+Truly normal distributions (i.e., with negative values) are actually pretty rare in most data sets, but it is common to find *truncated* normal distributions, whose values tend to be above zero. In the Ames data, one particular example is the Lot Area.
+
+```{r}
+ames |>
+  filter(Lot_Area < 50000) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = Lot_Area),
+                 colour='white') +
+  theme_hc()
+```
+
+In general, this distribution can be treated as normally distributed. We just need to keep in mind the anomalously large houses.
+
+## The Sampling Distribution
+
+Each of the above datasets represent examples of data collected from the natural world. Importantly, **these are only samples of data**. In other words, the researchers who curated it *could have* chosen a slightly (or drastically) different selection of houses from Ames, Iowa, or maybe they could have chosen to start/end their collection in different years, or they could have chosen a different city altogether. Whatever the case, this is only one example representing one situation.
+
+The essence of Statistics comes from a simple fact that is true in almost every case:
+
+**Our data is a sample from a strictly unknown population.**
+
+This premise is the basis behind the sampling distribution, which forms the foundation for most statistical routines.
+
+### Sampling
+
+In general, we define a **statistic** to be a single value describing a sample, and a **parameter** as the *same* (theoretical) value describing the corresponding population. E.g., the mean value of a sample could be seen as an estimation for the "true" mean value of its population. Statistics are usually denoted by letters (e.g., $s$ for sample standard deviation) or letters with bars over them (e.g., $\bar{x}$ for sample mean), and parameters are typically denoted by Greek characters (e.g., $\mu$ for mean, or $\sigma$ for standard deviation, standard deviation, where $\sigma = \sqrt{\sigma^2}$ and $\sigma^2$ is the *variance*, or the average squared difference between each value $x$ and $\mu$.).
+
+### EXERCISE
+
+1.  Build a vector of 20 roughly normally distributed numbers. (The mean and standard deviation are up to you).
+2.  Write a function which draws `m` random samples of size `k < 20` from this vector *with* replacement, and returns the average value of each sample. So, if `m = 5` , this function should return a vector of length 5. *Note: this is also called "bootstrapping".*
+3.  Run the function, and compare the result with the actual mean of the starting vector. Play with `k`, and see what happens.
+
+### The Central Limit Theorem
+
+Now, let's say we start with a continuous uniform distribution of values between 0 and 2. As it turns out, the expected value for this distribution is the average of the two endpoints, or 1. *(This is actually our theoretical mean for the population.)*
+
+If we sample from this distribution, the sample average should be close to $1$.
+
+```{r}
+n <- 10  # sample size
+
+mean(runif(n, 0, 2))
+```
+
+When we sample (the `n` points above) from a theoretical distribution (like `runif`), it is analogous to sampling a whole dataset (say, `ames`) from its corresponding population (i.e., all houses in Ames, Iowa). But again, this is only one sample. Let's *simulate* $m$ *different* samples from a population (of course, this couldn't happen in real life), and plot the resulting averages. First, we'll write a function to run the simulation.
+
+```{r}
+# for sample size n, calculate sample average for m samples
+sim_unif <- function (n, m, min=0, max=2) {
+  
+  sim <- function (x) mean(runif(n, min, max))  # x is not used
+  
+  x <- map_dbl(1:m,     # for each iteration in 1, 2, ..., m
+               sim)     # return the result of this function
+  
+  df <- data.frame(
+    iter = 1:m,
+    sample_mean = x
+  )
+  
+  df
+}
+```
+
+Now we will plot the sample mean of $m = 20$ different samples, each with a sample size of $n = 5$ in a dot plot.
+
+```{r}
+n <- 5
+m <- 20
+
+sim_unif(n, m) |>
+  ggplot() +
+  geom_vline(xintercept = 1,
+             linetype = "dashed", color = "orange") +  
+  geom_dotplot(mapping = aes(x = sample_mean),
+               fill = "lightblue",
+               alpha = 0.8) +
+  scale_x_continuous(limits = c(0, 2), 
+                     breaks = c(0, 1, 2)) +
+  labs(title = paste(m, "Samples of Size", n, "from Uniform Distribution"),
+       x = "Sample Mean",
+       y = "Proportion of All Samples") +
+  theme_hc()
+```
+
+We can see that in general, these samples means are somewhat close to 1, but they do have a decently high dispersion. If we didn't know anything about the population distribution, we might expect that increasing our sample size will give us more information, and likely a more accurate estimate of the sample mean.
+
+```{r}
+n <- 30
+m <- 20
+
+sim_unif(n, m) |>
+  ggplot() +
+  geom_vline(xintercept = 1,
+             linetype = "dashed", color = "orange") +  
+  geom_dotplot(mapping = aes(x = sample_mean),
+               fill = "lightblue",
+               alpha = 0.8) +
+  scale_x_continuous(limits = c(0, 2), 
+                     breaks = c(0, 1, 2)) +
+  labs(title = paste(m, "Samples of Size", n, "from Uniform Distribution"),
+       x = "Sample Mean",
+       y = "Proportion of All Samples") +
+  theme_hc()
+```
+
+And, our values should get even closer as that number increases. *(Why?)*
+
+```{r}
+n <- 100
+m <- 20
+
+sim_unif(n, m) |>
+  ggplot() +
+  geom_vline(xintercept = 1,
+             linetype = "dashed", color = "orange") +  
+  geom_dotplot(mapping = aes(x = sample_mean),
+               fill = "lightblue",
+               alpha = 0.8) +
+  scale_x_continuous(limits = c(0, 2), 
+                     breaks = c(0, 1, 2)) +
+  labs(title = paste(m, "Samples of Size", n, "from Uniform Distribution"),
+       x = "Sample Mean",
+       y = "Proportion of All Samples") +
+  theme_hc()
+```
+
+If we increase the number of samples, and plot a distribution for all of these "possible samples we could have pulled", we'll have a histogram of sample means.
+
+```{r}
+n <- 10
+m <- 10000
+
+sim_unif(n, m) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = sample_mean),
+                 fill = "#3182bd",
+                 colour = "white") +
+  geom_vline(xintercept = 1,
+             linetype = "dashed", color = "orange") + 
+  scale_x_continuous(limits = c(0, 2), 
+                     breaks = c(0, 1, 2)) +
+  labs(title = paste(m, "Samples of Size", n, "from Uniform Distribution"),
+       x = "Sample Mean",
+       y = "Proportion of All Samples") +
+  theme_hc()
+```
+
+This distribution is called the **sampling distribution**, and it is an approximation of the normal distribution.
+
+As paraphrased from the OpenIntro Statistics book:
+
+*When we collect a sufficient number of independent samples of size* $n$ fro*m a population with mean* $\mu$ *and standard deviation* $\sigma$*, the **sampling distribution** of the means for these samples will be approximately normal, with mean* $\mu$ and standard deviation $\sigma / \sqrt{n}$.
+
+### Normality and the Z Score
+
+To generalize the normal distribution for any $\mu$ and any $\sigma$, we use a "z-score". This converts any normal distribution to the **Standard Normal Distribution** with a mean of 0 and a standard deviation of 1.
+
+$$
+Z = \frac{x - \mu}{\sigma}
+$$
+
+```{r}
+# +/- 3 std dev
+x1 <- c(seq(-3, -2, length.out = 200),
+        seq( 2,  3, length.out = 200))
+y1 <- dnorm(x1)
+
+# +/- 2 std dev
+x2 <- c(seq(-2, -1, length.out = 200),
+        seq( 1,  2, length.out = 200))
+y2 <- dnorm(x2)
+
+# +/- 1 std dev
+x3 <- c(seq(-1, 1, length.out = 200))
+y3 <- dnorm(x3)
+
+ggplot() +
+  geom_area(mapping = aes(x = x1, y = y1), fill = "pink") + 
+  geom_area(mapping = aes(x = x2, y = y2), fill = "lightgreen") + 
+  geom_area(mapping = aes(x = x3, y = y3), fill = "lightblue") + 
+  geom_function(xlim = c(-4, 4), fun = function(x) dnorm(x)) +
+  geom_vline(mapping = aes(xintercept = c(-3, -2, -1, 1, 2, 3)), 
+             linetype = "dashed", color = "gray", linewidth=1) +
+  geom_text(mapping = 
+              aes(x = c(-2.5, -1.5, 0, 1.5, 2.5), y = .225,
+                  label = c("99.7%", "95.5%", "68.3%", "95.5%", "99.7%")),
+            hjust = "middle") +
+  scale_x_continuous(breaks = -4:4) +
+  labs(title = "Standard Normal Curve",
+       x = "Z Score (standard deviations from mean 0)",
+       y = "Probability Density") +
+  theme_minimal() +
+  theme(legend.position="none")
+```
+
+The normal distribution has many helpful attributes, not the least of which is the percentage of data illustrated in the visualization above (known as the 68-95-99 rule). Now, to leverage these kinds of conclusions, rather than recreate different calculations tailored to every possible normal distribution, one only needs to convert *to* the Z score, draw conclusions, and if needed, convert back to the original values.

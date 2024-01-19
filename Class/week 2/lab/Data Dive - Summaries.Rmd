@@ -1,0 +1,533 @@
+---
+title: "Data Dive-Summaries"
+author: "Amritha Prakash"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Data Set - Sample Super Store :-**
+
+**Points to consider**
+A numeric summary of data for at least 10 columns of data \
+
+* For categorical columns, this should include unique values and counts
+* For numeric columns, this includes min/max, central tendency, and some notion of distribution (e.g., quantiles)
+* Summaries Combined 
+
+A set of at least 5 novel questions to investigate informed by the following:\
+
+* column summaries (i.e., the above bullet)
+* data documentation
+* your project's goals/purpose
+
+Use of aggregation functions (other than the ones used from the first bullet, above)
+I.e., use these explore something interesting about your data\
+
+A visual summary of at least 5 columns of your data \
+
+* This should include distributions at least
+* In addition, you should consider trends, correlations, and interactions between variables
+* Use different channels (e.g., color) to show how categorical variables interact with continuous variables
+
+----
+
+Read the Data set
+
+```{r}
+# Load tidyverse
+library(tidyverse)
+library(dplyr)
+
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+
+
+Various columns within the Data set:-
+```{r}
+colnames(Superstore_data)
+
+```
+Number of records :-
+```{r}
+nrow(Superstore_data)
+```
+
+**A numeric summary of data for at least 10 columns of data**
+
+Summarize the Data set -
+* For categorical columns, this should include unique values and counts
+
+1.Column Ship Mode :- 
+
+Unique values for the column - Ship Mode :-
+```{r}
+for (x in unique(Superstore_data$Ship.Mode)) {
+  print(x)
+}
+```
+Count of Unique Ship Modes :-
+```{r}
+n_distinct(Superstore_data$Ship.Mode)
+
+```
+
+2.Column Segment :-
+
+Unique values for the column - Segment :-
+```{r}
+for (x in unique(Superstore_data$Segment)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Segments: %s", n_distinct(Superstore_data$Segment))
+
+```
+3.Column Country :-
+
+Unique values for the column - Country
+```{r}
+for (x in unique(Superstore_data$Country)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Countries: %s", n_distinct(Superstore_data$Country))
+
+```
+4.Column City :-
+
+Unique values for the column - City
+```{r}
+unique(Superstore_data$City)
+```
+
+```{r}
+sprintf("Count of the unique cities: %s", n_distinct(Superstore_data$City))
+
+```
+5.Column State :-
+
+Unique values for the column - State
+```{r}
+
+unique(Superstore_data$State)
+```
+
+``` {r}
+sprintf("Count of the unique States: %s", n_distinct(Superstore_data$State))
+
+```
+
+6.Column Region :
+
+Unique values for the column - Region
+```{r}
+for (x in unique(Superstore_data$Region)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Regions: %s", n_distinct(Superstore_data$Region))
+
+```
+7.Column Category :-
+
+Unique values for the column - Category
+```{r}
+for (x in unique(Superstore_data$Category)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Categories: %s", n_distinct(Superstore_data$Category))
+
+```
+8.Sub-Category :-
+
+Unique values for the column - Sub-category
+```{r}
+sprintf("Unique values for the column - Sub-Category :"); 
+for (x in unique(Superstore_data$Sub.Category)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the Sub-Category: %s", n_distinct(Superstore_data$Sub.Category))
+
+```
+9.Postal Code :-
+
+Even though Postal code is numeric in nature, it doesn't have any value as the mean of a postal code wouldn't make sense. Hence considering it as a Categorical value.
+
+Unique values for the column - Postal code : 
+```{r}
+unique(Superstore_data$Postal.Code)
+```
+
+```{r}
+sprintf("Count of the Postal-Code: %s",n_distinct(Superstore_data$Postal.Code))
+
+```
+
+
+* For numeric columns, this includes min/max, central tendency, and some notion of distribution (e.g., quantiles)
+
+10.Sales :-
+```{r}
+summary(Superstore_data$Sales)
+
+```
+11.Quantity :-
+```{r}
+summary(Superstore_data$Quantity)
+
+```
+
+12.Discount :-
+```{r}
+summary(Superstore_data$Discount)
+```
+
+13. Profit :-
+```{r}
+summary(Superstore_data$Profit)
+```
+
+
+
+* Summaries Combined :
+```{r}
+summary(Superstore_data)
+```
+* Distinct Count of each column -
+```{r}
+sapply(Superstore_data,function(x) n_distinct(x))
+```
+
+#**Data Documentation:**
+
+
+1. There are 9994 rows. 
+2. The Data is tidy with about 13 columns,
+Each row represents a unique and separate observation.
+3. It fulfills the criteria of atleast 2 columns being continuous. 
+In my case the columns Sales(Price), Profit and Discount are Decimal
+Also, Profit is having both positive and negative values. Negative values are indicating Loss.\
+*Sales* having a range of $0.444 to $22638.480 \
+*Profit* having a range starting from $-6599.978 to $8399.976 \
+*Discount* having a range from 0 to 0.8 \
+*Quantity* is numeric with a range starting from  1 to 14. \
+
+4. It also fulfills the criteria of atleast 2 columns being categorical.
+In my case there are 9 categorical columns which are -
+Ship Mode, Segment, Country, City, State, Postal Code, Region, Category, Sub.Category  
+(Here, considering Postal Code as Categorical as the numeric in the value does not have any significance.)
+
+
+**Purpose of Data Collection**:- 
+To figure out the profit earned by the Superstore via its sales in various parts of USA. Further, it can be used to find trends in the same and come up with improvements. 
+
+Explanantion of each Columns :
+
+1. Ship Mode - It has 4 values, they are First Class, Same Day, Second Class and Standard Class. Each value is defines the limit for being delayed as follows: - \
+Same day: >=0 days \
+First class: >=2 days \
+Second class: >=3 days \
+Standard class: >= 5 days \
+
+2. Segment - 
+It is the product sector.There are segments which are Consumer, Corporate and Home Office
+
+3. Country - 
+This column contains the country details. It was found to be only for United States i.e one value. Hence this column can be removed.
+
+4. City - 
+Various Cities present in United States.There are about 531 cities.
+
+5. State - 
+There are 49 states in this dataset.
+
+6. Postal Code - 
+There are 631 postal codes in this dataset
+
+7. Region - 
+There are 4 regions in the dataset. i.e. South, West, Central and East
+
+8. Category - 
+There are 3 categories, they are Furniture, Office Supplies and Technology.
+
+9. Sub-Category - 
+There are 17 sub-categories, some of them are - Bookcases, Chairs, Labels, Tables, Storage, Furnishings, Art, Phones, Binders, Appliances, Paper, Accessories, Envelopes, Fasteners, Supplies, Machines, Copiers
+
+10. Sales - 
+It is the price. Having a range starting from $0.444 to $22638.480
+
+11. Profit - 
+It is the profit earned from the product. Can also indicate loss with a negative sign. Having a range -6599.978 to 8399.976
+
+12. Discount - 
+Discount given for the product purchased, range starts from 0 to 0.8. 
+
+13. Quantity - 
+The quantity of products bought, range starts from 1 to 14.
+
+
+
+In order to understand the data better we can try to visualize the data, which will indirectly help us in asking valid questions to investigate further.
+
+
+
+**visual summary **
+
+* Univariate Plot:-
+
+1.Ship Mode -
+
+From the plot, can observe that most purchases are done via Ship.Mode = Standard Class, followed by Second Class, First Class and Same Day.
+About 6000 records out of 9994 i.e. more than 50% purchase are via Standard Class ship mode.
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Ship.Mode, color = Ship.Mode, fill=Ship.Mode)) +
+  geom_bar()
+```
+
+```{r}
+last_plot() +
+  coord_polar()
+```
+
+2.Segment -
+
+From the plot below can figure out that most purchases are done for Consumer needs, which are greater than 5000 purchases.Followed by Corporate purchases which is around 3000 and Home Office with a count around 1800.
+
+So most purchases in the Superstore are done by the Consumer segment.
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Segment, color = Segment, fill=Segment)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +
+  theme_minimal()+
+  labs(title =" Count of Products bought based on Segments")
+```
+
+3.Region -
+
+Overall every region has bought products but from the plot below we can observe that customers from West and East part have purchased most products, when compared to Central and southern part of US.
+
+It answers the question -> which region has purchased the most products?
+
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Region, color = Region, fill=Region)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +
+  theme_minimal()+
+  labs(title =" Count of Products bought based on Region")
+```
+
+
+4.State -
+
+As it was seen above, there are about 49 states, plotting them all to understand the count of purchase is pretty difficult. Hence narrowing it down to top 10 states.
+
+It would answer the question -> which are the top 10 states that have purchased the products from the Superstore?
+
+```{r}
+state_count<- aggregate(Superstore_data$State,by=list(Superstore_data$State), FUN=length)
+
+top_10_states_count <-state_count %>%
+arrange(desc(x)) %>%
+    slice(1:10) %>%
+  rename (
+    state=Group.1,
+    count=x
+  )
+top_10_states_count
+
+```
+
+
+```{r}
+top_10_states_count |>
+  ggplot(mapping = aes(x=state, y=count, fill=state)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90))
+
+```
+Can see that California is the state that has the most purchases.
+
+
+
+5.City -
+As West region had most purchases of product, we can verify that by digging deep into the cities. 
+Also there are about 531 city. Drilling down and figuring out the top 10 cities.
+
+It would answer the question -> which are the top 10 cities that purchased the products from the Superstore?
+
+```{r}
+City_count<- aggregate(Superstore_data$City,by=list(Superstore_data$City), FUN=length)
+
+top_10_city_count <-City_count %>%
+arrange(desc(x)) %>%
+    slice(1:10) %>%
+  rename (
+    City=Group.1,
+    Count=x
+  )
+top_10_city_count
+
+```
+
+
+```{r}
+top_10_city_count |>
+  ggplot(mapping = aes(x=City, y=Count, fill=City)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90))
+
+```
+
+6.Category -
+From the plot below can figure out that Office supplies were the products which were bought the most, in all the purchases.
+
+It answers the question -> which category of products were bought the most?
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Category, color = Category, fill=Category)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +
+  theme_minimal()+
+  labs(title ="Count of products ordered (Category wise)")
+  
+```
+
+```{r}
+last_plot() +
+  coord_polar()
+```
+
+
+7.Sub - Category :-
+From the previous plot, we had observed that Office Supplies were the most purchased category. 
+In order to understand which item from those Office supplies are being bought the most, we plot the sub-category. In the plot below, we can see that Binders are the heavily purchased item, followed by Paper and Furnishings.
+
+
+It answers the question -> which sub-category of products were bought the most?
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Sub.Category, fill=Sub.Category)) +
+  geom_bar() +
+  theme_minimal() +
+   theme (axis.text.x =  element_text(angle=90))
+
+```
+
+8.Quantity - 
+Most products bought are in pairs or trios. So majorly people tend to buy in such forms.
+
+
+```{r}
+Superstore_data %>%
+ggplot() +
+geom_histogram(mapping = aes(x = Quantity), fill = 'blue', binwidth=1)
+```
+
+Multivariate plotting-
+
+1.Region vs Category :
+
+```{r}
+
+Superstore_data %>%
+ggplot() +
+  geom_bar(mapping = aes(x = Region, fill = Category), position="dodge")
+```
+
+
+Be it any region, all of them have a common category which was purchased the most i.e. Office Supplies
+While Furniture and Tech were bought little less.
+
+
+
+2.Quantity vs Profit
+
+```{r}
+Superstore_data %>%
+ggplot() +
+  geom_smooth(mapping = aes(x = Quantity, y = Sales))+
+  theme_minimal()
+
+```
+
+We can see the Sales and Quantity have a Positive Correlation. As the quantity increases the sales also increases.
+
+
+
+3.Sub-Category and Mean Sales -
+
+
+```{r}
+
+
+aggregate(Superstore_data$Sales, list(Superstore_data$Sub.Category), FUN=mean) |>
+  rename (
+    Sub_Category=Group.1,
+    Mean_Sales=x
+  ) |>
+arrange(desc(Mean_Sales))
+```
+
+
+Even though from uni-variate visualization we found that people bought binders and papers. The most costliest item from all of those was a Copier followed by Machines.
+
+4.Region vs Category vs Sales:
+
+
+```{r}
+
+Superstore_data %>%
+ggplot() +
+  geom_bar(mapping = aes(x = Region, y=Sales,fill = Category),stat = "identity", position="dodge")
+```
+
+
+From the above plot, we can see that Technologies are the costliest items be it any region. But if compared between regions, South has bought tech products which have a cost greater than $2000. Followed by Central, West and East region having cost approximately around $1750, $1450 and $1200 respectively.
+With Office supplies being the 2nd most costly item bought in all regions. But East regions sees similar cost on Office and furniture. 
+
+
+
+5.Region vs Category vs Profit:
+
+```{r}
+
+Superstore_data %>%
+ggplot() +
+  geom_bar(mapping = aes(x = Region, y=Profit,fill = Category),stat = "identity", position="dodge")
+```
+
+
+From the above plot, loss is seen for Technology in 3 regions - East (highest loss), South and West. Rest of the categories don't see much loss and have a little profit. Most profit is obtained in central region for Tech but loss due to Office supplies.
+
+

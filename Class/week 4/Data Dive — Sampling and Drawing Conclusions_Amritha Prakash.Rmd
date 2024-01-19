@@ -1,0 +1,836 @@
+---
+title: "Data Dive — Sampling and Drawing Conclusions"
+author: "Amritha Prakash"
+date: "2023-09-15"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 4
+
+### **Read the Data**
+
+```{r }
+# Load tidyverse
+library(tidyverse)
+library(dplyr)
+
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+### Task(s)
+
+(The purpose of this week's data dive is for you to think critically about what might go wrong when it comes time to make conclusions about your data.)
+
+-   Part 1: A collection of 5-10 random samples of data (with replacement) from at least 6 columns of data
+
+    -   Each subsample should be as long as roughly 50% percent of your data.We are simulating the act of collecting data from a population where the "population" is represented by the data set you already have.
+    -   Store each sample set in a separate data frame (e.g., df_i might contain m rows from columns 1-6)
+    -   These subsamples should include both categorical and continuous (numeric) data
+
+-   Part 2: Scrutinize these subsamples.
+
+    -   How different are they?
+    -   What would you have called an anomaly in one sub-sample that you wouldn't in another?
+    -   Are there aspects of the data that are consistent among all sub-samples?
+
+-   Part 3: Consider how this investigation affects how you might draw conclusions about the data in the future.
+
+------------------------------------------------------------------------
+
+**1. Part 1 -** Collecting 5/6 random samples of data (with replacement) from at least 6 columns of data
+
+Population : -
+
+```{r }
+# Population - count :
+# Rows of data in the data set -
+nrow(Superstore_data)
+```
+
+Sample size :-
+
+```{r}
+# Sample - should be as long as roughly 50% percent of your data. 
+# 50 % of 9994 
+sample_size <- 0.5 * 9994
+sample_size
+```
+
+-   sample 1
+
+```{r}
+set.seed(10)
+df_sample_1 <- Superstore_data |> sample_frac(0.5, replace = TRUE) |> select("Ship.Mode","Segment","Region", "State","Category","Sub.Category","Sales","Profit","Discount")
+nrow(df_sample_1)
+```
+
+```         
+Random 20 rows from 1st sample
+```
+
+```{r }
+
+df_sample_1 |> sample_n(20)
+```
+
+-   sample 2
+
+```{r}
+set.seed(50)
+df_sample_2 <- Superstore_data |> sample_frac(0.5, replace = TRUE)|> select("Ship.Mode","Segment","Region", "State","Category","Sub.Category","Sales","Profit","Discount")
+nrow(df_sample_2)
+```
+
+```         
+
+Random 20 rows from 2st sample
+```
+
+```{r}
+df_sample_2 |> sample_n(20)
+```
+
+
+-   sample 3
+
+```{r}
+set.seed(100)
+df_sample_3 <- Superstore_data |> sample_frac(0.5, replace = TRUE)|> select("Ship.Mode","Segment","Region", "State","Category","Sub.Category","Sales","Profit","Discount")
+nrow(df_sample_3)
+```
+
+```         
+
+Random 20 rows from 3rd sample
+```
+
+```{r}
+df_sample_3 |> sample_n(20)
+```
+
+-   sample 4
+
+```{r}
+set.seed(120)
+df_sample_4 <- Superstore_data |> sample_frac(0.5, replace = TRUE) |> select("Ship.Mode","Segment","Region", "State","Category","Sub.Category","Sales","Profit","Discount")
+nrow(df_sample_4)
+```
+
+```         
+
+Random 20 rows from 4th sample
+```
+
+```{r}
+df_sample_4 |> sample_n(20)
+```
+
+-   sample 5
+
+```{r}
+set.seed(150)
+df_sample_5 <- Superstore_data |> sample_frac(0.5, replace = TRUE)|> select("Ship.Mode","Segment","Region", "State","Category","Sub.Category","Sales","Profit","Discount")
+nrow(df_sample_5)
+```
+
+```         
+
+Random 20 rows from 5th sample
+```
+
+```{r}
+df_sample_5 |> sample_n(20)
+```
+
+-    All these sub-samples contain both categorical and continuous (numeric) data.
+
+
+
+-    Check for replacement and if there are common data inbetween the samples
+```{r}
+nrow(intersect(df_sample_1, df_sample_2))
+```
+    -    1568 records are common between sample 1 and 2
+
+
+```{r}
+nrow(intersect(df_sample_2, df_sample_3))
+```
+    -    1572 records are common between sample 2 and 3 
+
+
+```{r}
+nrow(intersect(df_sample_3, df_sample_4))
+```
+
+    -    1547 records are common between sample 3 and 4 
+
+
+```{r}
+nrow(intersect(df_sample_4, df_sample_5))
+```
+
+    -    1582 records are common between sample 4 and 5 
+
+
+
+**Part 2:-** Scrutinize these sub-samples
+
+1. Lets take into consideration Column - Segment :
+
+-   Segment :-
+
+    1.  check the various segments in each sample -\
+        -   Sample 1 -
+
+    ```{r}
+    count_df_sample_1 <- df_sample_1 |> group_by(Segment) |>
+      summarise(total_count_segment=n(),
+                .groups = 'drop') 
+    count_df_sample_1
+
+    ```
+
+    ```         
+        -  Sample 2 -
+    ```
+
+    ```{r}
+    count_df_sample_2 <- df_sample_2 |> group_by(Segment) |>
+      summarise(total_count_segment=n(),
+                .groups = 'drop') 
+    count_df_sample_2
+
+    ```
+
+    ```         
+        -  Sample 3 -
+    ```
+
+    ```{r}
+    count_df_sample_3 <- df_sample_3 |> group_by(Segment) |>
+      summarise(total_count_segment=n(),
+                .groups = 'drop') 
+    count_df_sample_3
+
+    ```
+
+    ```         
+        -  Sample 4 -
+    ```
+
+    ```{r}
+    count_df_sample_4 <- df_sample_4 |> group_by(Segment) |>
+      summarise(total_count_segment=n(),
+                .groups = 'drop') 
+    count_df_sample_4
+
+    ```
+
+    ```         
+        -  Sample 5 -
+    ```
+
+    ```{r}
+    count_df_sample_5 <- df_sample_5 |> group_by(Segment) |>
+      summarise(total_count_segment=n(),
+                .groups = 'drop') 
+    count_df_sample_5
+
+    ```
+
+-   From all the above samples, for categorical value - SEGMENT 
+    -  we see 3 types of Segment,the data is somewhat spread out and the count of "Home Office" in all samples is seen to be around 900.
+    -  This indicates that for the whole population the Home Office is the least purchased Segment.
+    -  This is same in the case of other 2 segments.Corporate (around 1500) and Consumer (around 2600) segments see a similar count on all samples.
+    -  This indicates that the data is spread evenly.
+
+
+
+
+2. Lets take into consideration Column - Sales :
+
+-   Sales :-
+
+    1.  Mean Sales in each sample -\
+        -   Sample 1 - \
+        Mean of Sales for sample 1 :-
+        
+    ```{r}
+mean_Sample_1 <- df_sample_1 |> pluck("Sales") |> mean(na.rm=TRUE)
+mean_Sample_1
+    ```
+
+             
+        -  Sample 2 - \
+        Mean of Sales for sample 2 :-
+        
+    ```{r}
+mean_Sample_2 <- df_sample_2 |> pluck("Sales") |> mean(na.rm=TRUE)
+mean_Sample_2
+    ```
+    
+         
+        -  Sample 3 -
+        Mean of Sales for sample 3 :-
+        
+    ```{r}
+mean_Sample_3 <- df_sample_3 |> pluck("Sales") |> mean(na.rm=TRUE)
+mean_Sample_3
+    ```
+    
+    
+        -  Sample 4 -
+        Mean of Sales for sample 4 :-
+        
+    ```{r}
+mean_Sample_4 <- df_sample_4 |> pluck("Sales") |> mean(na.rm=TRUE)
+mean_Sample_4
+    ```
+    
+           
+        -  Sample 5 -
+        Mean of Sales for sample 5 :-
+        
+    ```{r}
+mean_Sample_5 <- df_sample_5 |> pluck("Sales") |> mean(na.rm=TRUE)
+mean_Sample_5
+    ```
+    
+```{r}
+Mean_of_Sample_average <- mean(mean_Sample_1, mean_Sample_2, mean_Sample_3, mean_Sample_4, mean_Sample_5)
+Mean_of_Sample_average 
+```
+    
+    
+-   From all the above samples, for Continuous value - SALES 
+    - we see the mean of sales in each sample to be somewhat similar. The average of the same comes out to be 246.45. There are no anomalies observed there. 
+
+
+    2.  Max Sales in each sample -\
+        -   Sample 1 - \
+        Max of Sales for sample 1 :-
+        
+    ```{r}
+max_Sample_1 <- df_sample_1 |> pluck("Sales") |> max(na.rm=TRUE)
+max_Sample_1
+    ```
+
+             
+        -  Sample 2 - \
+        Max of Sales for sample 2 :-
+        
+    ```{r}
+max_Sample_2 <- df_sample_2 |> pluck("Sales") |> max(na.rm=TRUE)
+max_Sample_2
+    ```
+    
+         
+        -  Sample 3 -
+        Max of Sales for sample 3 :-
+        
+    ```{r}
+max_Sample_3 <- df_sample_3 |> pluck("Sales") |> max(na.rm=TRUE)
+max_Sample_3
+    ```
+    
+    
+        -  Sample 4 -
+        Max of Sales for sample 4 :-
+        
+    ```{r}
+max_Sample_4 <- df_sample_4 |> pluck("Sales") |> max(na.rm=TRUE)
+max_Sample_4
+    ```
+    
+           
+        -  Sample 5 -
+        Max of Sales for sample 5 :-
+        
+    ```{r}
+max_Sample_5 <- df_sample_5 |> pluck("Sales") |> max(na.rm=TRUE)
+max_Sample_5
+    ```
+    
+    
+  
+-   From all the above samples, for Continuous value - SALES 
+    -    we see the maximum to be varying in each sample, 1st and 3rd sample have a record with Maximum sale of 22638.48, when compared to rest.
+    -    Almost all other samples have various max values. Sample 2 sees a max value  of 9099.93, which wouldnt be true if we considered that sample alone. So that max value would have been incorrect if considered max for the entire population. And then there are other max values too in each of the other samples (like 17499.95, 13999.96)
+    -    Overall considering the samples the max seems to common value of 22638.48, which was observed in 2 samples.
+
+
+
+
+
+    3.  Minimum Sales in each sample -\
+        -   Sample 1 - \
+        Min of Sales for sample 1 :-
+        
+    ```{r}
+min_Sample_1 <- df_sample_1 |> pluck("Sales") |> min(na.rm=TRUE)
+min_Sample_1
+    ```
+
+             
+        -  Sample 2 - \
+        Min of Sales for sample 2 :-
+        
+    ```{r}
+min_Sample_2 <- df_sample_2 |> pluck("Sales") |> min(na.rm=TRUE)
+min_Sample_2
+    ```
+    
+         
+        -  Sample 3 -
+        Min of Sales for sample 3 :-
+        
+    ```{r}
+min_Sample_3 <- df_sample_3 |> pluck("Sales") |> min(na.rm=TRUE)
+min_Sample_3
+    ```
+    
+    
+        -  Sample 4 -
+        Min of Sales for sample 4 :-
+        
+    ```{r}
+min_Sample_4 <- df_sample_4 |> pluck("Sales") |> min(na.rm=TRUE)
+min_Sample_4
+    ```
+    
+           
+        -  Sample 5 -
+        Min of Sales for sample 5 :-
+        
+    ```{r}
+min_Sample_5 <- df_sample_5 |> pluck("Sales") |> min(na.rm=TRUE)
+min_Sample_5
+    ```
+  
+-   From all the above samples, for Continuous value - SALES 
+    -    we see the minimum to be varying in each sample. The least of all was 0.444 which is seen in 2 of the samples.
+    -    Rest of the samples have other minimum values like 0.852, 0.556, 0.836. But for the populatin seems like 0.444 the minimum value for sales.
+
+
+
+
+
+
+3. Lets take into consideration Column - State :
+
+-   State :-
+
+    1.  check the various state in each sample -\
+
+        -   Sample 1 - \
+        Top 10 states where the purchases were done the most.\
+
+    ```{r}
+    count_df_sample_1 <- df_sample_1 |> group_by(State) |>
+      summarise(total_count_state=n(),
+                .groups = 'drop') |>   arrange(desc(total_count_state))
+    head(count_df_sample_1, 10)
+
+    ```
+
+    10 states where the purchases were done the least.\
+
+    ```{r}
+       tail(count_df_sample_1,10)
+
+    ```
+
+             
+        -   Sample 2 - \
+    
+    Top 10 states where the purchases were done the most. \
+
+    ```{r}
+    count_df_sample_2 <- df_sample_2 |> group_by(State) |>
+      summarise(total_count_state=n(),
+                .groups = 'drop') |>   arrange(desc(total_count_state))
+    head(count_df_sample_2, 10)
+
+    ```
+
+    10 states where the purchases were done the least.\
+
+    ```{r}
+       tail(count_df_sample_2,10)
+
+    ```
+
+             
+        -  Sample 3 - \
+    Top 10 states where the purchases were done the most. \
+
+    ```{r}
+    count_df_sample_3 <- df_sample_3 |> group_by(State) |>
+      summarise(total_count_state=n(),
+                .groups = 'drop') |>   arrange(desc(total_count_state))
+    head(count_df_sample_3, 10)
+
+    ```
+
+    10 states where the purchases were done the least.\
+
+    ```{r}
+       tail(count_df_sample_3,10)
+
+    ```     
+        -  Sample 4 - \
+        Top 10 states where the purchases were done the most.\
+
+    ```{r}
+    count_df_sample_4 <- df_sample_4 |> group_by(State) |>
+      summarise(total_count_state=n(),
+                .groups = 'drop') |>   arrange(desc(total_count_state))
+    head(count_df_sample_4, 10)
+
+    ```
+
+        10 states where the purchases were done the least.\
+
+    ```{r}
+       tail(count_df_sample_4,10)
+
+    ```   
+        -  Sample 5 - \
+        Top 10 states where the purchases were done the most.\
+
+    ```{r}
+    count_df_sample_5 <- df_sample_5 |> group_by(State) |>
+      summarise(total_count_state=n(),
+                .groups = 'drop') |>   arrange(desc(total_count_state))
+    head(count_df_sample_5, 10)
+
+    ```
+
+        10 states where the purchases were done the least.\
+
+    ```{r}
+       tail(count_df_sample_5,10)
+
+    ```
+
+-   From all the above samples, for categorical value - STATE\
+     -   We have calculated the top 10 states which purchase the products.It has been observed that top 5 states are always constant in each of the sample. Even the order is somewhat same. 
+         1. California
+         2. New York
+         3. Texas
+         4. Pennsylvania
+         5. Illinois/Washington/Ohio
+         
+         The remaining states(6 to 10) have certain similarities with the top 5 while occasionally changing their order. The top-performing states within each sample are, nevertheless, largely stable. \
+         
+     -    We have calculated the least 10 states which purchase the products.Here it can be observed that there are certain differences in the state with count at the bottom within the samples.   
+           1. Sample_1 has the following order for last 5 (Montana	5 > North Dakota	5	> Maine	4	> West Virginia	1	> Wyoming	1	) \
+           2. Sample_2 has the following order for last 5 (Vermont	3	> South Dakota	2	> West Virginia	2	> Wyoming	2	> Maine	1	) \
+           3. Sample_3 has the following order for last 5 (Idaho	8		> Vermont	8> District of Columbia	5	> Maine	1	> Wyoming	1	) \
+           4. Sample_4 has the following order for last 5 (North Dakota	4	> West Virginia	4	> District of Columbia	3	> Maine	3	>Wyoming	1	) \
+           5. Sample_5 has the following order for last 5 (South Dakota	6 > North Dakota	5	> West Virginia	3	> Maine	2	> Wyoming	1	)
+           
+           From above samples and their last count on products purchased can see that, West Virginia, Maine and Wyoming is having the least count in all the samples. 
+           In the 2nd sample it is seen that Vermont is present in the bottom 5 for one of the samples, a case where the least of all in counts of products are purchased.
+           Also, in 1st and 3rd sample can see Montana and Idaho state present in the sample of least products, which wasnt the case in other samples.
+           But overall, certain states are seen to be similar in case of being the least. No major anomallies detected.
+           
+           
+4. Lets take into consideration Column - Profit :
+
+-   Profit :-
+    1.  Mean Profit in each sample -\
+        -   Sample 1 - \
+        Mean of Profit for sample 1 :-
+        
+    ```{r}
+mean_Sample_1 <- df_sample_1 |> pluck("Profit") |> mean(na.rm=TRUE)
+mean_Sample_1
+    ```
+
+             
+        -  Sample 2 - \
+        Mean of Profit for sample 2 :-
+        
+    ```{r}
+mean_Sample_2 <- df_sample_2 |> pluck("Profit") |> mean(na.rm=TRUE)
+mean_Sample_2
+    ```
+    
+         
+        -  Sample 3 -
+        Mean of Profit for sample 3 :-
+        
+    ```{r}
+mean_Sample_3 <- df_sample_3 |> pluck("Profit") |> mean(na.rm=TRUE)
+mean_Sample_3
+    ```
+    
+    
+        -  Sample 4 -
+        Mean of Profit for sample 4 :-
+        
+    ```{r}
+mean_Sample_4 <- df_sample_4 |> pluck("Profit") |> mean(na.rm=TRUE)
+mean_Sample_4
+    ```
+    
+           
+        -  Sample 5 -
+        Mean of Profit for sample 5 :-
+        
+    ```{r}
+mean_Sample_5 <- df_sample_5 |> pluck("Profit") |> mean(na.rm=TRUE)
+mean_Sample_5
+    ```
+    
+    
+-   From all the above samples, for Continuous value - PROFIT \ 
+    - we see the mean of Profit in each sample to be somewhat similar, within the range of 24 to 36. \
+    - We can say that the profit for all samples depicts that the populations also has a similar average on profit achieved through each sale.
+
+
+    2.  Max Profit in each sample -\
+        -   Sample 1 - \
+        Max of Profit for sample 1 :-
+        
+    ```{r}
+max_Sample_1 <- df_sample_1 |> pluck("Profit") |> max(na.rm=TRUE)
+max_Sample_1
+    ```
+
+             
+        -  Sample 2 - \
+        Max of Profit for sample 2 :-
+        
+    ```{r}
+max_Sample_2 <- df_sample_2 |> pluck("Profit") |> max(na.rm=TRUE)
+max_Sample_2
+    ```
+    
+         
+        -  Sample 3 -
+        Max of Profit for sample 3 :-
+        
+    ```{r}
+max_Sample_3 <- df_sample_3 |> pluck("Profit") |> max(na.rm=TRUE)
+max_Sample_3
+    ```
+    
+    
+        -  Sample 4 -
+        Max of Profit for sample 4 :-
+        
+    ```{r}
+max_Sample_4 <- df_sample_4 |> pluck("Profit") |> max(na.rm=TRUE)
+max_Sample_4
+    ```
+    
+           
+        -  Sample 5 -
+        Max of Profit for sample 5 :-
+        
+    ```{r}
+max_Sample_5 <- df_sample_5 |> pluck("Profit") |> max(na.rm=TRUE)
+max_Sample_5
+    ```
+  
+-   From all the above samples, for Continuous value - PROFIT 
+    -    we see the maximum profit to be somewhat 8399.976.
+    -    3 samples, seems to have the max around 6719.981. This would not entirely claim to be an anomaly, but if that sample is considered alone then the assumption would be that products were not sold with a higher profit to the Superstore. But that is not the case.
+    -    Sample 2 seems to have max of 2591.957, which would not be considered as a max of Profit, when compared to rest of the samples. Hence it can be considered as an anomaly.
+
+
+
+
+
+    3.  Minimum Profit in each sample -\
+        -   Sample 1 - \
+        Min of Profit for sample 1 :-
+        
+    ```{r}
+min_Sample_1 <- df_sample_1 |> pluck("Profit") |> min(na.rm=TRUE)
+min_Sample_1
+    ```
+
+             
+        -  Sample 2 - \
+        Min of Profit for sample 2 :-
+        
+    ```{r}
+min_Sample_2 <- df_sample_2 |> pluck("Profit") |> min(na.rm=TRUE)
+min_Sample_2
+    ```
+    
+         
+        -  Sample 3 -
+        Min of Profit for sample 3 :-
+        
+    ```{r}
+min_Sample_3 <- df_sample_3 |> pluck("Profit") |> min(na.rm=TRUE)
+min_Sample_3
+    ```
+    
+    
+        -  Sample 4 -
+        Min of Profit for sample 4 :-
+        
+    ```{r}
+min_Sample_4 <- df_sample_4 |> pluck("Profit") |> min(na.rm=TRUE)
+min_Sample_4
+    ```
+    
+           
+        -  Sample 5 -
+        Min of Profit for sample 5 :-
+        
+    ```{r}
+min_Sample_5 <- df_sample_5 |> pluck("Profit") |> min(na.rm=TRUE)
+min_Sample_5
+    ```
+  
+-   From all the above samples, for Continuous value min Profit or even Loss can be figured out
+    -    we see the minimum to be a loss in all of the samples.From those can incur, the products bought all over US are sold with a minimum loss of 6599.978. Negative indicates Loss, I believe. 
+    -    Also, in one of the sample minimum loss is obtained to be around 3399.98.
+    -    Rest of the 3 samples have a common loss of 3839.99
+
+
+
+5. Lets take into consideration Column - Region and Sales :
+
+-   Region and Quantity :-
+    1.  check the various Region and Sales in each sample \
+        -   Sample 1 - \
+
+    ```{r}
+    count_df_sample_1 <- df_sample_1 |> group_by(Region) |>
+      summarise(total_max_region_sales=max(Sales),
+                .groups = 'drop') |>
+      arrange(desc(total_max_region_sales),.by_group= TRUE)
+    count_df_sample_1
+
+    ```
+        We can see that when grouping by Region and Segment, products bought in the southern region see the max sale value. Followed by West region.
+        
+        
+        -  Sample 2 -
+
+    ```{r}
+    count_df_sample_2 <- df_sample_2 |> group_by(Region) |>
+      summarise(total_max_region_sales=max(Sales),
+                .groups = 'drop') |>
+      arrange(desc(total_max_region_sales),.by_group= TRUE)
+    count_df_sample_2
+
+    ```
+        We can see that when grouping by Region and Segment, products bought in the Eastern region have products purchased with max sale cost. While Southern is seen to be at the last.
+         
+         
+                 
+        -  Sample 3 -
+    ```
+
+    ```{r}
+    count_df_sample_3 <- df_sample_3 |> group_by(Region) |>
+      summarise(total_max_region_sales=max(Sales),
+                .groups = 'drop') |>
+      arrange(desc(total_max_region_sales),.by_group= TRUE)
+    count_df_sample_3
+
+    ```
+        From above grouping can see products from southern region have the highest sale.
+             
+        -  Sample 4 -
+    
+
+    ```{r}
+    count_df_sample_4 <- df_sample_4 |> group_by(Region) |>
+      summarise(total_max_region_sales=max(Sales),
+                .groups = 'drop') |>
+      arrange(desc(total_max_region_sales),.by_group= TRUE) 
+    count_df_sample_4
+
+    ```
+        From above grouping can see products from Western region have the highest sale. But southern is at the last.
+        
+        
+        -  Sample 5 -
+
+    ```{r}
+    count_df_sample_5 <- df_sample_5 |> group_by(Region) |>
+      summarise(total_max_region_sales=max(Sales),
+                .groups = 'drop') |>
+      arrange(desc(total_max_region_sales),.by_group= TRUE) 
+    count_df_sample_5
+
+    ```
+        From above grouping can see products from central region have the highest sale.Followed by Eastern region.
+        
+
+-   From all the above samples, for categorical value - Region and Max_Sales : 
+    - we see for about 2 samples Southern region has the max sales cost for the products purchased. Also, the value of sales is 22638.480	 in each.
+    - But in rest of the samples, South is seen to be the region having mid or even lowest at sale value. This seemed like an anomaly considering the samples showing a different picture.We cant entirely rely on any sample for knowing the max sales in regions.
+
+
+-----
+
+### Conclusions :-
+
+1.    For Segment column - we see 3 types of Segment,all the samples saw the segments to be consistent among each other with Home Office being the least and Consumer segment being the most purchased one.This indicates that the data is spread evenly.
+
+2.     For Sales column - 
+       -    Mean of Sales :-   The sales mean across each sample comes out to be somewhere in the range of 217 to 255. The average of the same comes out to be 246.45. There are no anomalies observed there. All records in each sample somehow depict the population to have a similar average sales. 
+       
+       -    Minimum of Sales : -    we see the minimum to be varying in each sample. The least of all was 0.444 which is seen in 2 of the samples. If considered to look into separate min values, then we can say that there is an anomaly in minimum of sales, that varies (0.852, 0.556, 0.836) But for the population overall minimum value seems to be 0.444.
+
+       -    Maximum of Sales :    Overall considering the samples the max of sales seems to be 22638.48, which was observed in 2 samples. But anomaly can be observed, where one of the samples had maximum sample to be around 9099.93, which would be an outlier.
+    
+3.    For State column -  
+     -   We can observe the top 5 states to be consistent across each sample, even the order is somewhat same. Following are the ones:
+         1. California
+         2. New York
+         3. Texas
+         4. Pennsylvania
+         5. Illinois/Washington/Ohio \
+         
+     -    For 5 states which purchase the products least, \
+          -  It can be observed that West Virginia, Maine and Wyoming is having the least count in all the samples. So this is consistent across the samples. Considering the same, can conclude the same for the entire population. \
+          -   Few anomalies like  Montana and Idaho state are present in the sample of least products, which wasnt the case in other samples.  \
+     
+          -   But overall, certain states are seen to be similar in case of being the least. No major anomallies detected.  \
+         
+      
+
+
+4.    For Profit column - 
+       -    Mean of profit :-   we see the mean of Profit in each sample to be somewhat similar, within the range of 24 to 36. We can say that the profit for all samples depicts that the populations also has a similar average on profit achieved through each sale.
+       
+       -    Minimum of profit : -    we see the minimum to be varying in each sample. The least of all was 0.444 which is seen in 2 of the samples. If considered to look into separate min values, then we can say that there is an anomaly in minimum of sales, that varies (0.852, 0.556, 0.836) But for the population overall minimum value seems to be 0.444.
+
+       -    Maximum of profit :    we see the maximum profit to be somewhat 8399.976. \
+            3 samples, seems to have the max around 6719.981. This would not entirely claim to be an anomaly, but if those samples are considered alone then the assumption would be that products were having that much of profit. But that is not the case.
+            Sample 2 seems to have max of 2591.957, which would not be considered as a max of Profit, when compared to rest of the samples. Hence it can be considered as an outlier , with max profit within that range.
+            
+            
+5.    For  Column - Region and Sales -   we see for about 2 samples Southern region has the max sales cost for the products purchased. Also, the value of sales is 22638.480	 in each.
+    -    But in rest of the samples, South is seen to be the region having mid or even lowest at sale value. This seemed like an anomaly considering the samples showing a different picture.Hence, We cant entirely rely on any sample for knowing the max sales in regions for entire population, as each count matters.
+    
+----
+
+With respect to investigation affecting future, from above data can incur that if there are similarities in each sample, we can definitely generalize to attain the whole idea of how the population might behave. \
+But if there are certain records that arent observed in each sample then they would certain outliers that might affect the further investigation. \
+
+
+  

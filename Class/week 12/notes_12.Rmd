@@ -1,0 +1,450 @@
+\# Time Series Modeling
+
+-   Time Series Data
+-   Visualizing Time Series
+-   Time Series Components
+-   Univariate Time Series Modeling
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+
+# time series toolkits
+library(xts)
+library(tsibble)
+```
+
+## Time Series Data
+
+Recall that linear modeling requires that our data is i.i.d., that is, independently and identically distributed. In other words, we require that each observation is independent and doesn't correlate with or depend on previous observations. For example, in a classroom of randomly selected students, the test score of each student (we should expect) are i.i.d. observations.
+
+However, when this is not the case, we have a situation where each observation correlates with or depends on observations *prior* to it. The best way to model this relationship is to **use time as an explanatory variable** in a model, and we call this a Time Series Model. In fact, more often than not, time is the *only* explanatory variable needed to build a robust model for response variables, and we call this a Univariate Time Series Model.
+
+> In this class, **we only consider inferential Univariate Time Series Models**. Time series *forecasting* (multivariate or otherwise) can be accomplished more efficiently using machine learning models, and other predictive methods we do not cover in this course.
+
+Consider this log of [earthquakes](https://github.com/leontoddjohnson/i590/tree/main/data/quakes) across the world over the last 10 years (as of November 2023).
+
+```{r}
+url_ <- "https://raw.githubusercontent.com/leontoddjohnson/i590/main/data/quakes/quakes.csv"
+quakes <- read_delim(url_, delim = ",")
+```
+
+An earthquake on our earth is not independent of the last earthquake that has occurred. It might not be immediately obvious that this is true in general though, so we need a way to identify when this is the case.
+
+### Identifying Time Series Data
+
+1.  The first defining component of time series data is when you recognize that "order matters". Often this is seen when "datetime" or "date" is a column in your dataset.
+2.  Second (and maybe more obviously), when you plot your data with time (or date) on the x-axis, you notice some kind of pattern.
+3.  Lastly, for each unit of time (e.g., day, hour, etc.), we expect a single value. For example, the magnitude of each earthquake is only pertinent if an earthquake occurred. So, the magnitude of "the earthquake" at time $t$ doesn't always make sense. However, the *number* of quakes each day, or the temperature measured every hour, or the location of a bee after $s$ seconds are all sensible time series response variables.
+
+### Time Series Objects in R
+
+The capabilities in base R are a bit restricting when it comes to exploring time series data, and the options for time series packages are vast. In this lab, we use the popular and robust [`xts`](https://cran.r-project.org/web/packages/xts/index.html) package for time series modeling and [`tsibble`](https://tsibble.tidyverts.org/) for tidyverse data management.
+
+To start the modeling process, we need to create an appropriate time series object:
+
+1.  The response variable needs to be clearly defined and calculated uniquely for every unit of time. In this way, each row needs to be distinct, without duplicates.
+2.  The index must be consistent and regular. So, it wouldn't make sense to have 3 rows of data for '2021-01-01' and then 1 row of data for '2021-01-04'.
+3.  There can be no implicitly missing rows. I.e., if we skip from '2021-01-01' to '2021-01-03', we need to create an `NA` row for '2021-01-02'.
+
+We will use the `time` column as an index, and define our response variable to be **"the number of earthquakes each day"**. Here, we'll use `latitude` and `longitude` as a sort of identifier for each earthquake, and `mag` as a particular value of interest. We will only count an earthquake if there is a magnitude logged for it.
+
+*Note: we use the `_` symbol to indicate an intermediate data frame.*
+
+```{r}
+# filter only pertinent time series data, and remove duplicates
+quakes_ <- quakes |>
+  select(time, latitude, longitude, mag) |>
+  distinct()
+
+# look at the data
+ View(quakes_)
+```
+
+Next, we'll convert this tibble into a **ts**ibble (pronouncing "ts" as in "cats") with [`as_tsibble`](https://tsibble.tidyverts.org/reference/as-tsibble.html), so we can leverage time series functionality in tidyverse fashion. To create a consistent and regular, we use `index_by` along with `summarise` in the same way we would use it with `group_by`. In our case, we're interested in the number of earthquakes *per day*, so we use [`date`](https://lubridate.tidyverse.org/referaence/date.html) to summarize by individual dates. You could also use [`floor_date`](https://lubridate.tidyverse.org/reference/round_date.html) to aggregate down to any number of seconds, hours, days, etc. (e.g., try `floor_date(time, "12 hours")`).
+
+The last requirement is that there are no "gaps" or implicitly missing rows of data. To calculate how often this happens, we could use [`count_gaps`](https://tsibble.tidyverts.org/reference/count_gaps.html), then verify by looking at the data. Here, we will just fill them (with `NA`) if they exist using [`fill_gaps`](https://tsibble.tidyverts.org/reference/fill_gaps.html).
+
+```{r}
+# create a tsibble of daily earthquake counts
+quakes_ts <- as_tsibble(quakes_, index=time) |>
+  index_by(date = date(time)) |> # index_by() similar to group_by()
+  summarise(num_quakes = sum(!is.na(mag))) |> # n() not being used because we assume that certain value is not present i.e. mag is not , 
+  fill_gaps() # fill implicit missing values (16th jan to 18th jan, 17th jan doesnt exist) - index needs to have continuity, otherwise errors might be issue. 
+
+head(quakes_ts)
+```
+
+Now, we're ready to create a separate "xts" time series data frame for statistical modeling.
+
+```{r}
+# an "xts" object separate from the original
+quakes_xts <- xts(x = quakes_ts$num_quakes, 
+                  order.by = quakes_ts$date)
+
+quakes_xts <- setNames(quakes_xts, "quakes")
+
+head(quakes_xts)
+```
+
+> **NOTICE: The only variables needed for time series modeling are (1) time, and (2) a response variable.** It is possible to incorporate multiple explanatory variables into time series models, just as we can incorporate time series elements into regression models, but this often overcomplicates our ability to interpret the model, which is our purpose in this course. Not only that, it can be shown that some of the most effect and robust [models](https://peerj.com/preprints/3190/) use only time and the response itself --- in fact, there is *plenty* of latent information contained in just those two.
+
+### **Time Series Tools**
+
+Here, we have data represented in three different formats: tibble, tsibble, and xts, and we will be manipulating these data using different tools. For example:
+
+-   [tsibble](https://tsibble.tidyverts.org/) for datetime functions specific to tsibbles
+    -   [reference](https://tsibble.tidyverts.org/reference/index.html)
+-   [lubridate](https://lubridate.tidyverse.org/) (& the tidyverse) for general datetime functions on tibbles *and* tsibbles
+    -   [cheat sheet](https://lubridate.tidyverse.org/#cheatsheet)
+
+*(The [xts](https://cran.r-project.org/web/packages/xts/index.html) package is for **eXtending** the **T**ime **S**eries modeling capabilities of R.)*
+
+## Visualizing Time Series
+
+```{r}
+quakes_ts|>
+ggplot() +
+  geom_line(mapping = aes( x= date, y=num_quakes))+
+   theme_hc()
+```
+
+Time series data can be quite messy to visualize, as highly periodic data tends to become quite noisy. A common method for improving our ability to visualize these data is **smoothing**. Smoothing methods translate the data in such a way that a "smooth" curve can be drawn to represent the data using some heuristic. Here, we'll talk about two of the most popular methods.
+
+-   Rolling Average
+-   LO(W)ESS
+
+### Rolling Average
+
+Recall that our time series is broken out by day. So, we can look at a window of the past $s$ days, calculate the average, and let that number represent the new data point at time $t = s$. Continuing this process across the rest of the data, we can see that a line plot of this data will become "smoother" for larger values of $s$ and higher fidelity with smaller values of $s$.
+
+We'll use the `rollapply` function on the xts object, and define a `mean` which ignores missing values. Since this is an xts object, we just need to access the data using `%>%` and `.` syntax (explicitly passing data through a pipe).
+
+```{r}
+quakes_xts %>%
+  rollapply(width = 30, \(x) mean(x, na.rm = TRUE), fill = FALSE) %>%
+  ggplot(mapping = aes(x = Index, y = quakes)) +
+  geom_line() +
+  labs(title = "Earthquakes Over Time",
+       subtitle = "Monthly Rolling Average") +
+  theme_hc()
+```
+
+### LO(W)ESS
+
+LOcally Weighted Scatterplot Smoothing, or LOcally Estimated Scatterplot Smoothing is a method by which we can visualize the general trend of noisy data, and we've already used it before with `geom_smooth`. The idea is to consider a moving window of (relative) size `span`, and fit several *weighted* linear regression models to the data within each window. Roughly,
+
+1.  Define the window of data (a subset of the full data set).
+2.  The middle point in this window holds the highest weight, and the weights decrease for data points further away from the middle.
+3.  Fit a weighted linear model to these data, and capture the slope of the line at that point.
+4.  Move on to the next window.
+
+A different line is fit for each window, and the resulting curve models the slopes for each of those lines. This method is specifically designed for *plotting* data, so you will likely only use it (as we have already done) with `geom_smooth`. In this way, the default method is "loess" anyway.
+
+```{r}
+quakes_ts |>
+  filter_index("2022" ~ "2023") |>
+  drop_na() |>
+  ggplot(mapping = aes(x = date, y = num_quakes)) +
+  geom_point(size=1, shape='O') +
+  geom_smooth(span=0.2, color = 'blue', se=FALSE) +
+  labs(title = "Earthquakes During 2022") +
+  theme_hc()
+```
+
+## Time Series Components
+
+There are three main components of any time series:
+
+-   **Trend**
+-   **Season**
+-   **Residual** (nature)
+
+We define each row of the time series as a **period**. That is, moving from row 1 at time $t=1$ to row 2 at time $t=2$ is equivalent to completing one period. We say that the **frequency** of the time series is the number of periods per "cycle". So, if our data has a weekly cycle, and a daily period, our frequency is 7.
+
+### Trend
+
+The *trend* of a time series is the general increasing or decreasing of the response variable from the beginning of the time series to the end. To illustrate this, we'll just look at a subset of our earthquakes data, and we can use a linear model to illustrate increase or decrease.
+
+(We can subset a tsibble using the [filter_index](https://tsibble.tidyverts.org/reference/filter_index.html) function.)
+
+```{r}
+quakes_ts |>
+  filter_index("2021-01" ~ "2022-06") |>
+  ggplot(mapping = aes(x = date, y = num_quakes)) +
+  geom_line() +
+  geom_smooth(method = 'lm', color = 'blue', se=FALSE) +
+  labs(title = "Earthquakes the First Half of 2022") +
+  theme_hc()
+```
+
+The blue line in this plot represents a *linear* fit to this time series data. Of course, this would not be a very good model, but it indicates a **trend** as the number of earthquakes decreases from early 2021 to mid-2021.
+
+Using an ad hoc linear model such as this, or just looking at plot of the time series from beginning to end is typically the best way to detect a trend.
+
+### Season
+
+Seasonality is indicated by periodicity in the data. If you think of a sine wave, this represents a "pure" seasonality. In other words, seasonality is typically seen as a repeating pattern. **A time series can "contain" multiple seasons**.
+
+We can start to see a bit of seasonality in our data if we re-index the data, and group it by half-year instead of looking at it by each individual day. We will also use LOESS to plot a curve which follows the data based on a moving window of data with some width (`span`).
+
+```{r}
+quakes_ts |>
+  index_by(year = floor_date(date, 'halfyear')) |>
+  summarise(avg_quakes = mean(num_quakes, na.rm = TRUE)) |>
+  ggplot(mapping = aes(x = year, y = avg_quakes)) +
+  geom_line() +
+  geom_smooth(span = 0.3, color = 'blue', se=FALSE, ) +
+  labs(title = "Average Earthquakes Over Time",
+       subtitle = "(by half year)") +
+  scale_x_date(breaks = "1 year", labels = \(x) year(x)) +
+  theme_hc()
+```
+
+We can start to see that there is a peak in the number of earthquakes about once every \~2.5 years, and a trough which follows for the same. This "once every \_\_\_" kind of terminology indicates a season. There is also an apparent telescoping effect over time. That is, it seems the peaks are becoming more extreme over time.
+
+### Residual (Nature)
+
+The residual component in the data is essentially everything that is *not* trend or seasonality, i.e., all that's left over. Our data has a lot of it:
+
+```{r}
+quakes_ts |>
+  ggplot(mapping = aes(x = date, y = num_quakes)) +
+  geom_line() +
+  labs(title = "Earthquakes Over Time") +
+  theme_hc()
+```
+
+### Decomposition
+
+It is possible to computationally decompose a time series into its different components. The aim here is to better understand the trend and seasonal components of a time series model. In general, we can describe a time series using either an additive model or a multiplicative model:
+
+$$
+y_t = T_t + S_t + \varepsilon_t \qquad \text{or} \qquad 
+y_t = T_t \cdot S_t \cdot \varepsilon_t
+$$
+
+where at time $t$, $y_t$ is the value of the time series, $T_t$ is the trend contribution, $S_t$ is the seasonal contribution, $\varepsilon$ is the residual noise leftover.
+
+We would use an additive model if the seasons are consistent, and peaks to not increase (or decrease) in amplitude over time. Alternatively, we'd use a multiplicative model if there is apparent "magnification" of season peaks over time (e.g., our earthquakes data, above).
+
+We can extract the trend, season, and noise components of time series data using the following steps:
+
+1.  Estimate the trend, $\hat{T}_t$. This can be done using a linear regression model (as we saw above), or using moving averages.
+2.  De-trend the series. This is accomplished by subtracting the trend for an additive model $\hat{S}_t = y_t - \hat{T}_t$, or dividing it for multiplicative models $\hat{S}_t = y_t / \hat{T}_t$
+3.  Estimate the season. Consider multiple seasons (e.g., monthly, bi-monthly, etc.), then calculate the average value for each season. So, if we had a daily periods and monthly seasons, every day would be compared to the average value for its month. Choose the season which results in the lowest residual values (at the next step).
+4.  Calculate the residual. For additive models, this is the remainder $\hat{\varepsilon}_t = y_t - \hat{T}_t - \hat{S}_t$, and for for multiplicative models this is a factor $\hat{\varepsilon}_t = y_t /(\hat{T}_t \hat{S}_t)$.
+
+The `decompose` function in R automates this process.
+
+```{r}
+# ... ISSUE ...
+# **bonus points** to anyone who can figure it out!
+# decompose(quakes_ts)
+```
+
+## Univariate Time Series Modeling
+
+Here, we'll discuss four types of univariate modeling:
+
+-   Auto-Regressive Models (AR)
+-   Moving Average Models (MA)
+-   Integrated Differencing Models (I)
+
+These can be combined into different varieties of complex models (e.g., ARMA, ARIMA, etc.), and typically we use the term "ARIMA" to encapsulate all of them.
+
+For the remainder of this lab, we will use the [wikipediatrend](https://cran.r-project.org/web/packages/wikipediatrend/index.html) package to access the [Wikipedia pageviews API](https://pageviews.wmcloud.org/). In particular, we will be investigating the daily page views of the [Time Series](https://en.wikipedia.org/wiki/Time_series) Wikipedia page between 2008 and 2013.
+
+```{r}
+#install.packages("wikipediatrend")
+library(wikipediatrend)
+```
+
+```{r}
+hits <- wpd_get_exact(page="Time_series", 
+                      from="2008-01-01", 
+                      to="2013-01-01", 
+                      lang="en", 
+                      warn=TRUE)
+
+hits <- select(hits, date, views)
+
+hits_ts <- as_tsibble(hits, index = date)
+```
+
+```{r}
+hits_ts |>
+  ggplot() +
+  geom_line(mapping = aes(x = date, y = views)) +
+  labs(title = '"Time Series" Page Views on Wikipedia') +
+  theme_hc()
+```
+
+> *Note: **The use of ARIMA models in data science is rare**, and most of the **inference** we can draw from time series data has been shown above (i.e., in visualizing and scrutinizing). However, we'll present the following discussion mainly to demystify the method for those who may encounter it later on.*
+
+### Stationarity
+
+Time series models require a predictable pattern, specifically a pattern which does not depend on the time at which the series is observed. This is codified in the idea of stationarity. In short, **a stationary time series is one without trend or seasonality**. We define a (weakly) stationary time series as one which has:
+
+-   a **constant expected value** or average (think of drawing a horizontal trend line through the time series)
+-   **equal covariance**/correlation for each point and its lag 1 (the series should look the roughly same backwards and forwards)
+-   **equal variance** for all time intervals (the amplitude of these peaks/troughs should remain consistent)
+
+Usually, this is enough for our models to perform as expected.
+
+### Autocorrelation
+
+If correlation is the amount to which two different variables change together (i.e., think $\text{corr}(x_1, x_2)$), then *auto*correlation must be the amount to which a single variable changes with itself over time. In other words, we present autocorrelation between $y$ at some time $t$, $y_t$, and $y$ at an earlier **"lag"** $t-h$, $y_{t-h}$. These are good for identifying seasons in the data.
+
+We calculate autocorrelation with:
+
+$$
+\text{AC}(h) = \frac{\text{Cov}(y_t, y_{t-h})}{\text{Var}(y_t)}
+$$
+
+And, it can be plotted using the `acf` function in R.
+
+```{r}
+acf(hits_ts, ci = 0.95, na.action = na.exclude)
+```
+
+Each lag here represents one week. By default, tsibble will represent daily time series data with a *frequency* of 7, meaning that there are 7 periods per lag. Optionally, we can adjust for this in our definition of the `hits_xts` time series object. E.g., for irregular patterns that don't typically follow a calendar, you might choose to set your `frequency` to be 1 to keep it as agnostic as possible.
+
+```{r}
+hits_xts <- xts(hits_ts$views, 
+                order.by = hits_ts$date,
+                frequency = 7)  # we'll keep this as 7
+
+hits_xts <- setNames(hits_xts, "views")
+```
+
+The blue lines represent a (95%) confidence interval across lags. If a line at lag $t^*$ passes either of these lines, we have an indication that each time period $t$ is likely correlated with its previous time period at lag $t^*$.
+
+When we look at the above plot where each lag is a day, we can see that $y_t$ is of course maximally correlated with itself at $h=0$, but then it's also highly correlated lag $h=7$. After that, we have slight seasonal repeats. This indicates at least a weekly autocorrelation.
+
+#### Partial Autocorrelation
+
+Partial autocorrelation is conditional autocorrelation. I.e., where autocorrelation is the correlation between $y_t$ and $y_{t-h}$, partial autocorrelation accounts for the lags in between; it is the correlation between $y_t$ and $y_{t-h}$ *given* $y_{t-h+1}, \dots, y_{t-1}$. In a way, this corrects for seasonal repetitions, like the repeating phenomenon above. These are good for identifying AR models (which we'll see below).
+
+For example, the partial autocorrelation between a time period and its lag at $h=3$ is:
+
+$$
+\text{PAC}(3) = \frac{\text{Cov}(y_t, y_{t-3})}
+{\sqrt{\text{Var}(y_t|y_{t-1}, y_{t-2})\text{Var}(y_{t-3}|y_{t-1}, y_{t-2})}}
+$$
+
+Where $\text{PAC}(1) = \text{AC}(1)$ and $\text{Var} (Y|X)=\text{E} {\Big (}{\big (}Y-\text{E} (Y\mid X){\big )}^{2}\mid X{\Big )}$. Also, in a stationary time series, the two variances in the radical are equal to one another (looking forward vs. looking back yield the same expected variance).
+
+This can be plotted using the `pacf` function in R.
+
+```{r}
+pacf(hits_xts, na.action = na.exclude,
+     xlab = "Lag (Weekly)", main = "PACF for Wikipedia Hits")
+```
+
+So, if we take into account the lags in-between, lag $h = 6$ seems to be most correlated with the time periods.
+
+### Differencing
+
+Our data has a clear upward trend, and apparently there is some autocorrelation with previous lags. So, we are not meeting the first two requirements of stationary data. To alleviate these, we can remove the trend and the autocorrelation by *subtracting* them from each time period. This is called "differencing".
+
+For each period (i.e., each row of data), we can remove the trend by subtracting the value before it (at lag $h = 1$), and we have
+
+$$
+y'_t = y_t - y_{t-1}
+$$
+
+This is first-order differencing, but we can iterate on this multiple times (you can adjust the `differences` argument in `diff` below).
+
+```{r}
+hits_diff1 <- diff(hits_xts, lag = 1, na.pad = FALSE)
+
+hits_diff1 |>
+  ggplot() +
+  geom_line(mapping = aes(x = Index, y = views)) +
+  labs(x = 'Date',
+       title = '"Time Series" Page Views',
+       subtitle = "Diff = 1") +
+  theme_hc()
+```
+
+This looks much more stationary than what we had before. Notice, we're looking at a collection of differences between the current period and the last (oscillating between positive and negative values).
+
+Similarly, we can remove previous autocorrelations we noticed in the autocorrelation plots, such as `lag = 7`.
+
+```{r}
+hits_diff17 <- diff(hits_diff1, lag = 7, na.pad = FALSE)
+
+hits_diff17 |>
+  ggplot() +
+  geom_line(mapping = aes(x = Index, y = views)) +
+  labs(x = 'Date',
+       title = '"Time Series" Page Views',
+       subtitle = "Diff = 1") +
+  theme_hc()
+```
+
+What we have left looks mostly like noise, which is actually what we want for modeling.
+
+### Auto-Regressive Models
+
+An Auto-Regressive (AR) Model is a linear regression model with one or more previously observed response values (periods) *as* explanatory variables for the next response value. An AR(1) model uses the previous lag as the explanatory variable:
+
+$$
+y_t = c + \phi_1y_{t-1} + \varepsilon_t,\quad \mu = \frac{c}{1 - \phi_1}
+$$
+
+-   $\mu$ is the theoretical average value for $y_t$ (i.e., the horizontal line we could draw through the stationary time series). After lag=1 differencing, causing our average to be now zero, we see that $c$ must be equal to 0, and we would have $y_t = \phi_1 y_{t-1} + \varepsilon_t$.
+-   $\phi$ represents the relationship between $y_t$ and $y_{t-1}$. That is, it can be shown that the correlation between observations $h$ time periods apart is equal to $\rho_h = \phi_1^h$. So, when $\phi_1 < 0$ (typical) the time series oscillates about the mean.
+-   We treat this with the same linear model assumptions as before. E.g., $\varepsilon_t$ needs to be normally distributed around 0. That is, the properties of the errors are independent of the time period.
+
+The interpretation of (and requirements for) an AR(2+) model are more complicated and nuanced than is needed for most cases.
+
+```{r}
+# fit model
+model_ar1 <- ar(hits_diff17, order.max = 1)
+paste("coefficient: ", round(model_ar1$ar, 2))
+paste("AIC: ", round(model_ar1$aic[1], 2))
+```
+
+### Moving Average Models
+
+Whereas the AR model uses previous lags as explanatory variables in the model, the Moving Average (MA) model uses previous *errors* as the explanatory variables. For example, an $\text{MA}(k)$ model can be expressed using the following:
+
+$$
+y_t = \mu + \varepsilon_t + \theta_1\varepsilon_{t-1} + \theta_2\varepsilon_{t-2} + \cdots + \theta_k\varepsilon_{t-k}
+$$
+
+In this way, we can interpret each value $y_t$ as a weighted average of the past $k$ forecast errors (where the forecast is the curve defined by the model itself). Viewing the coefficients $\theta_i$ gives us a bit of insight into the relationship between each period and those before it. For example:
+
+-   more distant observations may have a greater influence on the current error, or more recent ones might.
+-   all previous observations may have just as much an influence on the current error as any other.
+
+### ARIMA Models
+
+An ARIMA model is defined by the following:
+
+1.  The order of auto-regressive terms (AR)
+2.  The (integrated) differencing applied by subtracting $\text{lag} = h$ (I)
+3.  The order of moving average terms (MA)
+
+So, we can do a simple moving average MA(2) model using the following:
+
+```{r}
+model_ma7 <- arima(hits_xts, order = c(0,0,7))
+print(model_ma7)
+```
+
+Here, we can see that the first lag and the 7th lag have a higher correlation with the period than the lags in between.
+
+Or, we can incorporate all that we've done here in one model:
+
+1.  AR(1)
+2.  Subtract one lag
+3.  MA(2)
+
+```{r}
+model_arima <- arima(hits_xts, order = c(1, 1, 7))
+print(model_arima)
+```

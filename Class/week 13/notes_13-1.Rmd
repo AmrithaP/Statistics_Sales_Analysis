@@ -1,0 +1,37 @@
+# Model Critique
+
+For this lab, you'll be working with a group of other classmates, and each group will be assigned a lab from a previous week. Your goal is to critique the models (or analyses) present in the lab.
+
+First, review the materials from the Lesson on Ethics and Epistemology (week 5?). This includes lecture slides, the lecture video, or the reading. You can use these as reference materials for this lab. You may even consider the reading for the week associated with the lab, or even supplementary research on the topic at hand (e.g., news outlets, historical articles, etc.).
+
+For the lab your group has been assigned, consider issues with models, interpretations, analyses, visualizations, etc. Use this notebook as a sandbox for trying out different code, and investigating the data from a different perspective. Take notes on all the issues you see, and possible solutions (even if you would need to request more data or resources to accomplish those solutions).
+
+**Share your model critique in this notebook as your data dive submission for the week.**
+
+As a start, think about the context of the lab and consider the following:
+
+-   Analytical issues, such as model assumptions
+
+-   Overcoming biases (existing or potential)
+
+-   Possible risks or societal implications
+
+-   Crucial issues which might not be measurable
+
+*Treat this exercise as if the analyses in your assigned lab (i.e., the one you are critiquing) were to be published, made available to the public in a press release, or used at some large company (e.g., for `mpg` data, imagine if Toyota used the conclusions to drive strategic decisions).*
+
+```{r}
+# your code here
+```
+
+> If you were unable to attend class, select a `notes_*.Rmd` file from a previous week (**not including weeks 1 or 3**), and complete the analysis above. Share your critique below.
+
+## Example
+
+For example, in Week 11, we used the year built, square footage, elevation, and the number of bedrooms to determine the price of an apartment.
+
+-   Is this a "good" selection of variables? What could we be missing, or are there potential biases inherent in the groups of apartments here?
+-   Nowhere in the lab do we investigate the assumptions of a linear model. Is the relationship between the response (i.e., $\log(\text{price})$) and each of these variables linear? Are the error terms evenly distributed?
+-   Is it possible that our conclusions are more appropriate for some group(s) of the data and not others?
+-   What if assumptions are not met? What could happen to this model if it were deployed on a platform like Zillow?
+-   Consider different evaluation metrics between models. What is a *practical* use for these values?

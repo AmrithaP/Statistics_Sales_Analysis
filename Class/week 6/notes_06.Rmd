@@ -1,0 +1,733 @@
+# Introduction to Inference
+
+We should already be familiar with the difference between "inferential statistics" and "predictive statistics", but in this notebook, we'll dig deeper into inference itself, and investigate what it looks like in the context of a data set.
+
+We'll go over the following topics:
+
+-   Inference
+-   Building Columns
+-   Bootstrapping
+-   Confidence Intervals
+-   Covariance and Correlation
+-   Response vs. Explanatory Variables
+
+## Inference
+
+Statistical Inference consists of two parts:
+
+-   **Drawing conclusions** about the properties of some population
+-   **Evaluating reliability** of conclusions based on observed or randomly sampled data
+
+For example, when we calculate the mean of a column of data, you could argue that we are *inferring* something about the "true" mean of its corresponding population. We can measure our reliability of this inference (or estimate) by investigating aspects of the data which might challenge our conclusion.
+
+For this notebook, let's use the [gapminder](https://cran.r-project.org/web/packages/gapminder/readme/README.html) dataset.
+
+```{r}
+library(tidyverse)
+library(gapminder)
+library(ggthemes)
+```
+
+## Building Columns
+
+Before we can draw conclusions about a population, let alone evaluate those conclusions, it benefits us to have as much information as we can gather about the population itself. Given some set of data, we do have several columns of data (i.e., observations of different variables), but often there are latent relationships in the data which are only made apparent by building columns based on others. Here, we'll discuss a *few* different ways to build on the columns we have.
+
+> *Note:*
+>
+> -   *the different ways you can create new columns is only limited by your imagination! Here, we only illustrate a **few** common examples.*
+> -   *of course, these methods can be applied to all columns, including ones that have been created! So, you can see how the process can build on itself.*
+
+### Deviation
+
+One way to gather a different "view" of our data is to compare each value in a column with a single value. That is, a deviation column is a subtraction operation: the difference between a row value and a constant value, illustrating it's *deviation* from the predefined constant value. One common example of this is the difference between a row value and its corresponding mean within a group.
+
+**Before mutating a data frame, save the "raw" version.**
+
+```{r}
+# let's start by saving the original dataset as "raw"
+gapminder_raw <- gapminder_unfiltered
+view(gapminder_raw)
+```
+
+#### Simple Difference
+
+Now, let's start by cleaning up the names of this data frame, then simply capturing the difference between the Year and the current year. So, we're creating a column representing the number of years since the year represented for that row.
+
+```{r}
+# we choose to overwrite the "filtered" gm data
+
+# uncomment this to see column names
+# colnames(gapminder_unfiltered)
+
+gapminder <- gapminder_unfiltered |>
+  # rename columns
+  rename(life_exp = "lifeExp",
+         population = "pop",
+         gdp_per_cap = "gdpPercap") |>
+  # get deviation column
+  mutate(years_since = year(now()) - year)
+```
+
+```{r}
+gapminder |>
+  select(years_since) |>
+  summary()
+```
+
+#### Difference By Groups
+
+We can also calculate a deviation column that is *dependent* on other columns. In this case, suppose we are interested in how a country's life expectancy (for some year) measures up to the average life expectancy for similar countries (in the same continent) during the same year.
+
+We've seen the `group_by`-`summarize` combination, but here we use a `group_by`-`mutate` combination, to create columns (based on groups). The syntax is similar.
+
+```{r}
+# it's best to test things out before setting variables
+gapminder <- gapminder |> 
+  group_by(continent, year) |>
+  mutate(life_exp_dev = life_exp - mean(life_exp),  # deviation
+         life_exp_avg = mean(life_exp)) |>       # group average
+  arrange(continent, year)
+
+gapminder |>
+  select(continent, year, country, life_exp_avg,
+         life_exp, life_exp_dev)
+```
+
+You'll notice in the output that this data frame is *technically* grouped. After adding the new column, we don't really need the groups anymore, so we can use `ungroup` to un-group the data.
+
+```{r}
+gapminder <- ungroup(gapminder)
+```
+
+#### EXERCISE
+
+This method of performing some calculation (e.g., subtraction) within groups can be applied to any expression! As a simple example, let's assume that the *only* countries in each continent are listed correctly in this dataset. Create a `perc_of_continent` column which represents the proportion of a country's continent that it makes up (i.e., by `population`).
+
+```{r}
+print("your code here")
+#total_continent <- n_distinct(continent)
+gapminder <- gapminder |> 
+  group_by(continent,year) |> 
+  mutate(perc_of_continent = round(population/sum(population),10) )
+
+gapminder |>
+  select(continent, year, country, population,
+         perc_of_continent)
+
+```
+
+### Rank
+
+Another calculation we can make is rank ordering continuous values. So, for each country, we can rank order its population based on all other countries that year.
+
+```{r}
+gapminder <- 
+  gapminder |>
+  group_by(year) |>                       # within each year ...
+  mutate(pop_rank = rank(population), pop_rank_desc = rank(desc(population))) |>  # rank order populations
+  ungroup()
+
+gapminder |>
+  arrange(year, pop_rank) |>
+  select (year, population, pop_rank, pop_rank_desc) 
+```
+
+### Continuous to Categorical
+
+We can also take a continuous variable, say `population`, and convert it into a categorical variable based on either predefined groups or percentiles.
+
+#### Predefined Groups
+
+Starting with groups, let's create a column that reflects whether or not a country's population was above the median population (i.e., in the upper half) for that continent *that year*, or below the median (i.e., the lower half).
+
+```{r}
+gapminder <-
+  gapminder |>
+    group_by(continent, year) |>
+    mutate(pop_median = median(population),
+           pop_half = ifelse(population >= median(population),
+                                 "upper half",
+                                 "lower half")) |>
+    ungroup()
+```
+
+```{r}
+# plotting just for a randomly selected year
+plot_year <- sample(gapminder$year, 1)
+
+gapminder |>
+  filter(year == plot_year) |>
+  ggplot() +
+  geom_point(mapping = aes(x = population, 
+                           y = continent,
+                           colour = pop_half)) +
+  scale_x_log10() + # log transformation - scaling it down , to see the visualization
+  scale_colour_brewer(palette = "Dark2") +
+  theme_hc() +
+  labs(title = paste("Population 50th percentiles for the year", plot_year))
+```
+
+So, we can see that this is doing what we want it to be doing.
+
+#### Cut
+
+Alternatively, we can cut the population into multiple groups based on some numbers (e.g., the order of magnitude or percentiles), or a predefined number of equally sized groups. The different options we have can be seen in all the `cut_ …` functions (see the Hel p panel). For now, we'll just use the built-in `cut` function to break the populations up based on their order of magnitude.
+
+> *How can we check the min/maximum orders of magnitude?*
+
+```{r}
+# breaks need to cover lowest and highest values
+oom_breaks <- 10 ^ c(4, 5, 6, 7, 8, 9, 10)
+oom_breaks
+
+# there should be one LESS label (these are "in between breaks")
+oom_labels <- c(">10K", ">100K", ">1M", ">10M", ">100M", ">1B")
+oom_labels
+```
+
+```{r}
+gapminder <-
+  gapminder |>
+  mutate(pop_oom = cut(population, breaks = oom_breaks, 
+                       labels = oom_labels, right = TRUE)) # right =TRUE will consider the right end of the group within the left group for instance - [0,15], (15,19], (19,30)
+#15 is in the left grp
+```
+
+```{r}
+gapminder |>
+  select(country, population, pop_oom) |>
+  sample_n(10) |> # in class
+  mutate (pop_oom_rank = rank(pop_oom))
+```
+
+#### EXERCISE
+
+Use a one of the ggplot2 `cut_` functions to create a column of data that breaks the countries into 5 equal groups based on population: `"very small", "small", "middle sized", "large", "very large"`.
+
+```{r}
+
+# there should be one LESS label (these are "in between breaks")
+oom_labels <- c("very small", "small", "middle sized", "large", "very large")
+oom_labels
+
+
+```
+
+### Difference
+
+We can group our data based on country, and *for each country*, we can use the `lag` function in *dplyr* to calculate the change in GDP Per Capita from year to year. To do this, we'll need to `order_by` year. **Again, we need to group our columns**. Otherwise, the first year of country B is going to be compared to the last year of country A.
+
+```{r}
+gapminder |>
+  group_by(country) |>
+  mutate(gdp_lag_1 = lag(gdp_per_cap, n = 1, order_by = year)) |>
+  arrange(country, year) |>
+  select(country, year, gdp_per_cap, gdp_lag_1)
+```
+
+Notice here, the *"l**a**g"* is capturing the *"l**a**st"* (or "previous") value. Also, since the difference in years might not always be consistent for each country, we should log that information, too.
+
+```{r}
+gapminder <- 
+  gapminder |>
+    group_by(country) |>
+    mutate(gdp_diff = gdp_per_cap - lag(gdp_per_cap, n = 1, 
+                                        order_by = year),
+           year_diff = year - lag(year, n = 1, 
+                                  order_by = year)) |>
+    ungroup()
+
+gapminder |>
+  arrange(country, year) |>
+  select(country, year, gdp_per_cap, gdp_diff, year_diff)
+```
+
+### Binarize
+
+A simple method for creating a new column was already used above, but we'll formalize it here. Any column can be turned into a binary column by defining some sort of [this] and thus a [not this]. For example, we can simply determine whether a country is our home country or not:
+
+```{r}
+gapminder <-
+  gapminder |>
+    mutate(is_us = country == "United States")
+
+gapminder |>
+  count(is_us)
+```
+
+### String Methods
+
+There are tons of ways you can [manipulate strings in R](https://stringr.tidyverse.org/). But, we'll use a simple example here by determining the number of "names" within a country name. E.g., the "United States" has 2 "names", and "Afghanistan" only has 1.
+
+```{r}
+# here, we apply the `length` function to each split string
+ct <- map_int(str_split(gapminder$country, " "), length)
+
+gapminder <- 
+  gapminder |>
+    mutate(country_name_ct = ct)
+
+gapminder |>
+  count(country_name_ct)
+```
+
+### Date Methods
+
+There are plenty of functions you can run on dates using the [lubridate](https://lubridate.tidyverse.org/) package. Since the Gapminder dataset does not contain a full date column (i.e., we only have the year column), we will leave it to the reader to explore possible ways to build columns using this package, especially using some of the methods described above.
+
+## Bootstrapping and Standard Error
+
+Recall that a **parameter** is an unknown value describing some attribute of a population or population distribution. When we "draw conclusions about a population", **we are estimating (inferring) parameter values based on our data**. But, we could have selected some other data ... with over 500 rows of data, we should have enough data to *simulate* pulling other samples we could have collected using random sampling.
+
+**Bootstrapping is using all our data as a stand-in for the full population**, and random sampling as a stand-in for recreation of our data collection.
+
+Take the life expectancy for all the countries in the 21st century:
+
+```{r}
+life_exp_2000s <-
+  gapminder |>
+    filter(year >= 2000) |>
+    pluck("life_exp")
+
+ggplot() +
+  geom_histogram(mapping = aes(x = life_exp_2000s),
+                 colour='white') +
+  theme_hc()
+```
+
+This histogram looks quite smooth (i.e., there are no significant breaks in the data), and we have over 500 rows of data, so we are probably safe to bootstrap from it.
+
+**A bootstrapped sample is the size of the original dataset, done *with* replacement.**
+
+```{r}
+bootstrap <- function (x, func=mean, n_iter=10^4) {
+  # empty vector to be filled with values from each iteration
+  func_values <- c(NULL)
+  
+  # we simulate sampling `n_iter` times
+  for (i in 1:n_iter) {
+    # pull the sample
+    x_sample <- sample(x, size = length(x), replace = TRUE)
+    
+    # add on this iteration's value to the collection
+    func_values <- c(func_values, func(x_sample))
+  }
+  
+  return(func_values)
+}
+
+life_exp_means <- bootstrap(life_exp_2000s)
+```
+
+```{r}
+ggplot() +
+  geom_histogram(mapping = aes(x = life_exp_means),
+                 color='white') +
+  labs(title = "10K Bootstrapped Sample Means of `life_exp_2000s`",
+       subtitle = "A *simulation* of the true sampling distribution",
+       x = "Bootstrapped Sample Mean",
+       y = "Number of Samples") +
+  theme_minimal()
+```
+
+What we see above is an *estimation* for the shape of our sampling distribution. Each sample mean in `life_exp_means` is represented in this histogram, and we can see that some sample means are larger than others. **The standard deviation of the (*true*) sampling distribution is called the standard error.** It is a measure for the dispersion of sample means, and informs the expected "error" of a sample mean against the true mean of the population. We can estimate it by calculating the standard deviation of our bootstrapped sample means, `life_exp_means`.
+
+```{r}
+life_exp_se_boot <- sd(life_exp_means)
+life_exp_se_boot
+```
+
+*If* the probability distribution of `life_exp` were roughly normal, then we could estimate the standard error (of a *sample* *mean*) using the following [function](https://en.wikipedia.org/wiki/Standard_error#Derivation):
+
+$$
+\text{SE}_\text{mean} = \frac{s}{\sqrt{n}}
+$$
+
+where $s$ is the standard deviation of our sample of data, and $n$ is the number of rows.
+
+```{r}
+life_exp_se_est <- sd(life_exp_2000s) / sqrt(length(life_exp_2000s))
+life_exp_se_est
+```
+
+You can see that these two values are quite different. Also, this function only works for the standard error of the mean of a normally distributed data set. But, we may want a standard error for any other statistic (e.g., median, max, etc.) for any distributed data. So, in general, **if you have sufficient data, use bootstrapping to calculate standard error.** Typically, over 100 rows is enough, but over 1K rows is even better.
+
+### Bootstrapping Other Statistics
+
+Of course, we can use the bootstrapping method to estimate parameters *other* than the mean ...
+
+## Confidence Intervals
+
+Suppose we're interested in the mean life expectancy over all countries in the world (i.e., where we assume each country in the "world" is represented in our data); this unknown value is our population **parameter**. Now, we do not know (nor will we ever know) this "true" mean for the population, so we should want to measure the uncertainty of our estimates, and confidence intervals are a commonly useful way to do this.
+
+```{r}
+avg_life_exp <- mean(life_exp_2000s)
+avg_life_exp
+```
+
+In fact, our data represents only one sample from the population (i.e., the `life_exp` for each row could have been slightly different based on a number of factors). Again, we don't know the true sampling population, but we can propose a possible one:
+
+```{r}
+f_life_exp <- \(x) dnorm(x, mean = 70, sd = 0.4)
+
+ggplot() +
+  geom_function(xlim = c(68.5, 71.5), 
+                fun = f_life_exp) +
+  geom_segment(mapping = aes(x = avg_life_exp - 0.4,
+                             y = f_life_exp(avg_life_exp),
+                             xend = avg_life_exp + 0.4,
+                             yend = f_life_exp(avg_life_exp),
+                             linetype = "proposed interval"),
+               color = "gray") +
+  geom_point(mapping = aes(x = avg_life_exp,
+             y = f_life_exp(avg_life_exp),
+             color = "our sample"), size = 2) +
+  labs(title = "*Possible* Sampling Distribution for `life_exp_2000s`",
+       subtitle ='In this case, the "true" mean is 70 years',
+       x = "Sample Mean",
+       y = "Probability Density",
+       color = "",
+       linetype = "") +
+  theme_minimal()
+```
+
+Who knows. Maybe the sample mean we're collecting is actually overestimating the true mean. We cannot know for sure. But, we can create an interval which we *expect* to contain the true mean with some defined level of confidence. So, **whenever we draw a conclusion from a confidence interval, we assume our sample is representative of the population**.
+
+### Z-Score
+
+Recall, the standard error represents the standard deviation of the sampling distribution. Also, note that the sampling distribution will always be a normal (Gaussian) distribution, due to the Central Limit Theorem. So, we know that the interval $(\mu - \text{SE}, \mu + \text{SE})$ should contain approximately 68.3% of all the sample means we *could* have calculated (possibly even our own), given true mean $\mu$ and standard deviation $\sigma=\text{SE}$.
+
+```{r}
+# we could pick anything here ...
+mu_ <- 2
+se_ <- 4
+z_ <- 1   # number of stdevs from the mean
+
+# the percentage of values within k stdevs from the mean
+pnorm(mu_ + z_ * se_, mu_, se_) - pnorm(mu_ - z_ * se_, mu_, se_)
+```
+
+In other words, if we know ahead of time that the value $z^*$ corresponds to the number of standard deviations from the mean which captures $\mathcal{P}$ percent of the data, we can say:
+
+$$
+P(\mu - z^* \cdot \text{SE} < \bar{x} < \mu + z^* \cdot \text{SE}) = \mathcal{P}
+$$
+
+for any sample mean $\bar{x}$ from the sampling distribution with mean $\mu$ and standard deviation $\text{SE}$. Now, let's convert our sampling distribution (and in turn, our sample mean $\bar{x}$) to the standard normal distribution. That is, subtract each element by $\mu$ and divide by the *estimated* standard error, $s/\sqrt{n} \approx \text{SE}$. Then, for a sufficiently large sample of data, we have
+
+$$
+\begin{align}
+P(-z^* < \frac{\bar{x} - \mu}{s/\sqrt{n}} < z^*) &\approx \mathcal{P} \\ \\
+\to P(\bar{x} - z^*\frac{s}{\sqrt{n}} < \mu < \bar{x} + z^*\frac{s}{\sqrt{n}}) &\approx \mathcal{P}
+\end{align}
+$$
+
+This interval $\displaystyle\bar{x}\pm z^* \frac{s}{\sqrt{n}}$ represents a confidence interval:
+
+**A** $\mathcal{P}$**-percent C.I. is expected to include the true mean** $\mu$ **of a distribution** $\mathcal{P}$**-percent of the time.** That is, if we create the same 95% C.I. using 100 different samples of data from the same distribution, then 95 of them will contain the population mean.
+
+We call this $z^*$ the "Z-score", and it corresponds to the "critical value" which yields the $\mathcal{P}$ percent of data described for the standard normal distribution. That is, to the *right* of $z^*$, we should have $(1 - \mathcal{P})/2$ percent of the data. So,
+
+```{r}
+P <- 0.95  # % confidence
+
+# z score (we need (1 - P)/2 of data to the right/upper tail)
+z_score <- qnorm(p=(1 - P)/2, lower.tail=FALSE)
+  
+ggplot() +
+  geom_function(xlim = c(-4, 4), fun = function(x) dnorm(x)) +
+  geom_vline(mapping = aes(xintercept = c(-z_score, z_score)), 
+             color = "orange") +
+  geom_text(mapping = aes(x = z_score + 0.1, y = .25), 
+            label = "z-score", color = "orange", hjust = "left") +
+  scale_x_continuous(breaks = -4:4) +
+  labs(title = "Standard Normal Curve",
+       x = "Standard Deviations from Mean 0",
+       y = "Probability Density") +
+  theme_minimal() +
+  theme(legend.position="none")
+```
+
+Again, $\mathcal{P}$ percent of the data lies between the orange vertical lines.
+
+### Using the Bootstrapped S.E.
+
+We've seen above that it's best to use the bootstrapped S.E. over the $s/\sqrt{n}$ calculation. So we'll use that in our confidence interval instead.
+
+Also, you *may* encounter a smaller sample of data (e.g., less than 100 rows) which is too small to approximate samples from the normal distribution. In these cases, you'd use the "t-statistic" which is the same "critical value", but from the [t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) which has a wider shape for smaller samples, and approximates the normal distribution for larger ones (in which case, the z-score works just as well).
+
+Let's compose a C.I. for the life expectancy based on our estimated standard error. Keep in mind, we want the *middle* $1 - \mathcal{P}$ of the distribution, so
+
+```{r}
+P <- .95  # % confidence
+n <- length(life_exp_2000s)
+
+# t-statistic with n-1 degrees of freedom
+t_star <- qt(p = (1 - P)/2, df=n - 1, lower.tail=FALSE)
+
+# t half-width
+CI_t <- t_star * life_exp_se_boot
+
+# z-score
+z_score <- qnorm(p=(1 - P)/2, lower.tail=FALSE)
+
+# z half-width
+CI_z <- z_score * life_exp_se_boot
+
+
+c(avg_life_exp - CI_t, avg_life_exp + CI_t)  # t-distribution
+c(avg_life_exp - CI_z, avg_life_exp + CI_z)  # normal distribution
+```
+
+> It makes sense that these are very close, given that our data is not small (i.e., well over 100 rows).
+
+### EXERCISE
+
+Interpret the above results. How would you explain either confidence interval in your own words? *Hint: See below for some inspiration ...*
+
+```{r}
+# for the sake of example, get 100 means and their standard error
+boot_n <- 100
+boot_means <- bootstrap(life_exp_2000s, n_iter = boot_n)
+boot_se <- sd(boot_means)
+true_mean <- mean(life_exp_2000s)
+
+t_star <- qt(p = (1 - P)/2, df=boot_n - 1, lower.tail=FALSE)
+
+lowers <- boot_means - t_star * boot_se
+uppers <- boot_means + t_star * boot_se
+
+mask <- (lowers < true_mean) & (true_mean < uppers)
+
+ggplot() +
+  geom_segment(mapping = aes(x = lowers, xend = uppers,
+                             y = 1:length(boot_means),
+                             yend = 1:length(boot_means),
+                             color = mask)) +
+  geom_vline(xintercept = true_mean, color = "orange") +
+  scale_color_manual(values = c("darkgray", "red"), 
+                     breaks = c(TRUE, FALSE)) +
+  theme_minimal() +
+  theme(legend.position="none") +
+  labs(x = "CI boundaries",
+       y = "Iteration")
+```
+
+### Bootstrapped Confidence Interval
+
+One particular issue with using either of these parametric confidence intervals (e.g., "t-" or normal) is that it forces us to make an explicit estimate for a population parameter (i.e., the standard error), which we do not have access to. Further, it confines us to only C.I.s for the sample mean, which might not be the parameter we're interested in. So, instead, we can use bootstrapping to *completely* define our confidence intervals.
+
+```{r}
+library(boot)
+```
+
+We'll use the *boot* library to build a function which calculates a percentage confidence interval.
+
+```{r}
+# we use a "_" so we don't overwrite the original function
+boot_ci <- function (v, func = median, conf = 0.95, n_iter = 1000) {
+  # the `boot` library needs the function in this format
+  boot_func <- \(x, i) func(x[i])
+  
+  b <- boot(v, boot_func, R = n_iter)
+  
+  boot.ci(b, conf = conf, type = "perc")
+}
+```
+
+For example, we can compare the results of this function to the mean bootstrap we calculated above:
+
+```{r}
+boot_ci(life_exp_2000s, mean, 0.95)
+```
+
+(They look pretty similar.) Or, we can calculate a new one, e.g., for the median:
+
+```{r}
+boot_ci(life_exp_2000s, median, 0.95)
+```
+
+Here, again, we are simulate pulling $N$ samples from the population by bootstrapping $N$ times from our data set, with replacement. For each bootstrap, we calculate the function value (e.g., mean or median), then determine the t-statistic or z-statistic which best captures $\mathcal{P}$ percent of the data.
+
+## Covariance and Correlation
+
+So far, we've been interested only in one variable, doing our best to understand that *single* variable based on our data. However, it's more likely that we want to understand how variables are related to one another, and eventually how one affects another. To start to understand how two variables relate to one another, we need to understand how they *vary* together.
+
+### Covariance
+
+For one variable, variance measure how much each point deviates from the mean. For two variables, **covariance** measures how much pairs of points deviate from their means *together*. It is concerned with either of the following:
+
+1.  variables increase/decrease together (`cov > 0`)
+2.  one increases while the other decreases (`cov < 0`)
+3.  variables do not share a *linear* pattern (`cov = 0`)
+
+$$
+\text{cov}(X, Y) = \sigma_{X,Y} = E[(X - \mu_{X})(Y - \mu_{Y})] \\
+\text{sample calculation} \to \frac{\sum_{i=1}^{n} (x_{i} - \bar{x})(y_{i} - \bar{y})}{n - 1}
+$$
+
+> *Note: R uses the Bonferroni Correction* $n-1$ *for the calculation for an unbiased estimate (i.e., imagine what this would be for one value of* $X$ and $Y$ *...)*
+
+The covariance is the expected value for the amount to which a variable has deviated from its mean, scaled by the amount to which another variable has deviated from its mean in the same direction. **It is a measure of *linear dependence* between two random variables.**
+
+```{r}
+w <- rep(1, 10)
+x <- 1:10
+y <- 10:1
+z <- rep(c(1, 2), 5)
+
+# explore different combinations of these
+cov(x, x)
+```
+
+For example, we can start by looking at the relationship between year and life expectancy for the country Portugal.
+
+```{r}
+plot_data <- 
+  gapminder |>
+    filter(country == "Portugal")
+
+plot_data |>
+  ggplot() +
+  geom_point(mapping = aes(x = population, y = life_exp)) +
+  labs(x = "Population", y = "Life Expectancy",
+       title = "Life Expectancy as Population Increases",
+       subtitle = paste("Covariance:", 
+                        round(cov(plot_data$population, 
+                                  plot_data$life_exp), 2))) +
+  theme_minimal()
+```
+
+When we compare this covariance value with the covariance of *years_since* and the *pop_rank*, all we can really determine is that one is slightly negative, and the other is much more positive.
+
+```{r}
+round(cov(plot_data$years_since, plot_data$pop_rank), 2)
+```
+
+This illustrates a critical issue: **the units of the covariance cannot easily be tied to anything useful (even if the sign can).**
+
+However, it can be shown that the maximum value of the covariance is the product of the variances for the two variables.
+
+$$
+|E[(X - \mu_{X})(Y - \mu_{Y})]| \leq \sigma_X\sigma_Y
+$$
+
+So, we can use this to scale our covariance to calculate a "correlation coefficient".
+
+### Pearson's Correlation Coefficient
+
+When we divide the covariance by the product of standard deviations for $X$ and $Y$, we have [Pearson's Correlation Coefficient](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient). This is a *normalized* version of the covariance, and it measures the stength of the linear relationship between the variables.
+
+$$
+\text{corr}(X, Y) = \rho_{X,Y} = \frac{E[(X - \mu_{X})(Y - \mu_{Y})]}{\sigma_X\sigma_Y} \\
+\text{sample calculation} \to r_{x,y} = \frac{\sum_{i=1}^{n} (x_{i} - \bar{x})(y_{i} - \bar{y})}{(n-1)s_x s_y}
+$$
+
+-   When $r$ is 1, all points $(x_i, y_i)$ lie on a positively sloping line
+-   When $r$ is -1, all points $(x_i, y_i)$ lie on a negatively sloping line
+-   When $r$ is near zero, points are randomly scattered
+
+```{r}
+round(cor(plot_data$population, plot_data$life_exp), 2)
+round(cor(plot_data$years_since, plot_data$pop_rank), 2)
+```
+
+Here, we can see that the linear relationship between *population* and *life_exp* is significantly stronger than the linear relationship between *years_since* and *pop_rank*. We also have a better picture for the positivity/negativity of both.
+
+### Spearman's Rho
+
+Pearson's correlation coefficient requires continuous values, were the division operation makes sense. But, for *discrete* values with an order (e.g., "small", "medium", "large") where "increasing/decreasing together" can still make sense, we should still have a measure of correlation. With these, we can use the *rank* of these values to calculate the **Spearman's Rho** or [Spearman's Rank Correlation](https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient).
+
+$$
+\rho_{R(X),R(Y)} = \frac{\text{cov}(\text{R}(X), \text{R}(Y))}{\sigma_{R(X)}\sigma_{R(Y)}} \\
+\text{sample calculation} \to r_{R(x),R(y)} = \frac{\text{cov}(\text{R}(x), \text{R}(y))}{s_{R(x)}s_{R(y)}}
+$$
+
+Where $R$ represents the *rank order* of the discrete variable. For example, we can use Spearman's Rho on the *pop_oom* column we made earlier, which contains string values representing the order of magnitude for the population.
+
+```{r}
+gapminder |>
+  mutate(pop_oom_rank = as.numeric(pop_oom)) |>
+  select(pop_oom, pop_oom_rank) |>
+  unique() |>
+  arrange(pop_oom)
+```
+
+And, to calculate Spearman's Rho, with this value and the *country_name_ct*, we use `as.numeric`.
+
+```{r}
+# we use `as.numeric` to get the factor level rank
+s_rho <- cor(as.numeric(gapminder$pop_oom), gapminder$country_name_ct, 
+             method = "spearman")
+
+s_rho
+```
+
+> *Note: R encodes the result of `cut_` as factor levels with an order, and the same for TRUE/FALSE and integer values. Otherwise, you may need to use `factor` or `as_factor` to set your discrete variable as you like before using `as.numeric`*.
+
+```{r}
+gapminder |>
+  group_by(pop_oom, country_name_ct) |>
+  count() |>
+  ggplot() +
+  geom_point(mapping = aes(x = pop_oom, y = country_name_ct, size=n)) +
+  labs(x = "Population Order of Magnitude",
+       y = "Country Name Length (in words)",
+       title = "Length of Country Name vs. Population",
+       subtitle = paste("Spearman's Rho = ", round(s_rho, 2)),
+       size = "Number of Rows") +
+  theme_minimal()
+```
+
+Spearman's Rho here does capture a slight decreasing trend here, but we notice the trend is very small, and it might not be worth mentioning given that the bulk of the data does not reflect the relative change.
+
+## Explanatory and Response Variables
+
+As we've seen, two variables can be interesting to investigate on their own, but it's also interesting to investigate how one affects the other. In these cases, we should designate a **response** variable which we expect to be affected by an **explanatory** variable. You may also see these described in other terms:
+
+| Explanatory | Response   |
+|-------------|------------|
+| Independent | Dependent  |
+| Exogenous   | Endogenous |
+| Feature     | Target     |
+
+: Synonyms for explanatory and response variables.
+
+A few examples of these could be:
+
+-   time of day (explanatory) and temperature (response)
+-   student age (explanatory) and class performance (response)
+
+In other words, **it should make sense for an explanatory variable to affect a response variable**, but not the other way around. E.g., someone's class performance doesn't *affect* a student's age, but the converse makes sense. When it comes to explanatory and response variables:
+
+-   **Explanatory variables are typically plotted on the x-axis, and response variables on the y-axis.**
+-   **If neither variable affects the other, then let them stand alone.**
+    -   In these cases, they can *both* be independent response or explanatory variables.
+
+```{r}
+plot_data <- 
+  gapminder |>
+    filter(country == "Portugal")
+
+plot_data |>
+  ggplot() +
+  geom_line(mapping = aes(x = year, y = population), color='lightblue') +
+  geom_point(mapping = aes(x = year, y = population), color='darkblue') +
+  scale_y_continuous(labels = \(x) paste(x / 10^6, "M")) +
+  labs(x = "Year", y = "Population (in millions)",
+       title = "Population in Portugal, Over Time",
+       subtitle = paste("Correlation:", 
+                        round(cor(plot_data$population, 
+                                  plot_data$life_exp), 2),
+                        " Observations:",
+                        count(plot_data))) +
+  theme_hc()
+```
+
+> *Note: with time on the x-axis, it's usually a good practice to connect points using a line plot. If there are few enough data points, as there are here, indicating them with another `geom_point` plot is also recommended.*
+
+Here, we see a positive trend between Population and Year for the country of Portugal. It makes sense for the year to affect the population, but of course the population cannot affect the year. We only have 58 data points, but the correlation coefficient is just as strong as what we see on the plot. Notice how the slight dip between the 60s and 70s doesn't affect the strength of the correlation that much given how linear the rest of the data is.
+
+## EXERCISE
+
+Select a couple explanatory and response variable from the updated `gapminder` dataset, plot them, and calculate their correlations. Determine whether they are strong or not, and explain your reasoning.

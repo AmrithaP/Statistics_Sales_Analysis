@@ -1,0 +1,285 @@
+---
+title: "Data-Dive : GLMs"
+author: "Amritha Prakash"
+date: "2023-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 10
+
+### Task(s)
+
+-   Part 1: Select an interesting binary column of data, or one which can be reasonably converted into a binary variable
+    -   This should be something worth modeling
+-   Part 2: Build a logistic regression model for this variable, using between 1-4 explanatory variables.
+    -   Interpret the coefficients, and explain what they mean in your notebook.
+    -   (Bonus) Using the Standard Error for at least one coefficient, build a C.I. for that coefficient, and interpret its meaning.
+-   Part 3: Consider a transformation for any explanatory variable, and illustrate why you need the transformation (or why you do not)
+    -   Scatter Plots ...
+
+------------------------------------------------------------------------
+
+### **Read the Data**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(dplyr)
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(broom)
+library(lindia)
+```
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+------------------------------------------------------------------------
+
+**1. Part 1 -** Select an interesting binary column of data, or one which can be reasonably converted into a binary variable.
+
+-   I do not have a binary variable in my data set.But I can make use of Mutate method to convert a categorical variable into binary.
+-   So to start, lets create a binary columns using one of the columns already provided in the data set. For this analysis I will create a column based on Category. I’ll call this “is_consumer”.
+
+```{r}
+    count_segment <- Superstore_data |> group_by(Segment) |>
+                  summarise(Segment_count=n(),
+                  .groups = 'drop') |>   arrange(desc(Segment_count))
+    tail(count_segment, 10)
+```
+
+-   Since can see that Corporate and Home Office segments are somehow related to each other, we can group them into one segment and assign a label as "0". While the Consumer segment can be considered as an other common segment, a category under which the individuals purchase their products.
+-   i.e. Creating another column as in_consumer, where if the segment is consumer they will have a label of 1. Otherwise labeling the rest as O, indicating that they are Home Office and Corporate sector.
+-   **Response Variable : in_consumer**
+
+```{r}
+Superstore_binary <- Superstore_data |>
+  mutate(in_consumer = case_when(Segment == 'Consumer' ~ 1,
+  Segment == 'Corporate' ~ 0,
+  Segment == 'Home Office' ~ 0))
+  
+
+Superstore_binary |> select("Segment","in_consumer","Sales","Quantity","Discount","Profit","Quantity")|> sample_n(10)
+  
+```
+
+-   Apart from that there can be more Response Variables for which we can experiment to understand how various factors play a role 
+```{r}
+Superstore_binary <- Superstore_binary |>
+  mutate(in_category = case_when(Category == 'Office Supplies' ~ 0,
+  Category == 'Furniture' ~ 1,
+  Category == 'Technology' ~ 1))|>
+  mutate(region_sep = case_when(Region == 'East' ~ 0,
+  Region == 'Central' ~ 0,
+  Region == 'West' ~ 1,
+  Region == 'South' ~ 1))
+  
+Superstore_binary |> select("Segment","in_consumer","Category","in_category","Region","region_sep","Sales","Quantity","Discount","Profit","Quantity")|> sample_n(10)
+```
+
+
+
+
+----
+
+**Part 2 -** Build a logistic regression model for this variable, using between 1-4 explanatory variables.
+
+1.  **Response Variable: in_consumer & Explanatory Variable: Sales**
+-   Considering the goal is to predict if the quantity bought is within Consumer Segment or Home Office/Corporate Segment. We can check if Sales has any hand in deciding if the product is from which Segment. - we use in_consumer which is a binary response variable, and sales as our explanatory variable. What we want is a monotonic function which outputs something like 1 or54 0 for a given sales.
+
+```{r}
+Superstore_binary |>
+  ggplot(mapping = aes(x = Sales, y = in_consumer)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  labs(title = "Modeling a Binary Response with OLS") +
+  theme_minimal()
+```
+
+-   Will try to model the variables within GLM to understand how they can be fit within Linear Model.
+
+```{r}
+model <- glm( in_consumer ~ Sales,data=Superstore_binary, family = binomial( link = 'logit'))
+model$coefficients
+```
+
+-   Now when we take in a value of Sales, and place it into our linear combination, then we are returned with some "probability" between 0 (Home Office/Corporate) and 1 (Consumer).
+
+$$
+    \hat{in\_consumer} = \log\left(\frac{p}{1 - p}\right) = 8.52677 \times e^-2 -3.299085 \times e^-5 \times \texttt{sales}
+    $$
+
+-   So, for every increase in Sales, the odds that the segment is a consumer one is multiplied by by $e^{+0.0221} = 1.022$, or for every increase in Sales, the odds of a segment being consumer goes down by about 12% ($1 - 1.022 = -0.022$). It suffices to say that e ^ coef is more interpretable than coef.
+
+-   The (Intercept) represents the log-odds when all the feature values are equal to zero. This can be used to determine a 50%-probability "decision threshold" for any variable. The 50% probability is reached when $\text{odds} = 1 \to \log(\text{odds}) = 0$. So, recalling the intercept and coefficient from above, we have
+
+$$
+\begin{align}
+0 &= \log(\text{odds}) \newline
+\to \quad 0 &= \beta_0 + \beta_1 x_1 \newline
+&= 8.52677 \cdot e^-5  -3.299085 \cdot e^-5 \cdot \texttt{sales} \newline
+8.52677 & = 0.0221 \cdot \texttt{sales}  \newline
+\to \quad \texttt{sales} &= \frac{8.52677}{0.0221} = 385.82
+\end{align}
+$$
+
+-   So, when the sales are roughly 385.82 \$ , there is a 50/50 odds that the Segment is consumer.
+
+-   Now let’s look at how the sigmoid function can help us give insight into the likelihood that the product sold is a Consumer Segment.
+
+```{r}
+# these coefficients come from the model
+
+# e^-5 = 0.0067
+sigmoid <- \(x) 1 / (1 + exp(-(8.526 - (3.299085*0.0067) * x)))
+
+Superstore_binary |>
+  ggplot(mapping = aes(x = Sales, y = in_consumer)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_function(fun = sigmoid, color = 'blue', linewidth = 1) +
+  labs(title = "Modeling a Binary Response with Sigmoid") +
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  theme_minimal()
+```
+
+-   Here we can see that this sigmoid function gives us insight into the likelihood that an product sold is not a consumer one, give some Sales for the Home office/Corporate.
+
+
+
+
+2.  **Response Variable: in_category & Explanatory Variable: Sales**
+-   Considering the goal is to predict if the quantity bought is within which category,i.e. Office Supplies or Tech/Furniture . We can check if Sales has any hand in deciding if the product is from which category - we use in_category which is a binary response variable, and sales as our explanatory variable. What we want is a monotonic function which outputs something like 1 or54 0 for a given sales.
+
+```{r}
+Superstore_binary |>
+  ggplot(mapping = aes(x = Sales, y = in_category)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  labs(title = "Modeling a Binary Response with OLS") +
+  theme_minimal()
+```
+
+
+```{r}
+model <- glm( in_category ~ Sales,data=Superstore_binary, family = binomial( link = 'logit'))
+model$coefficients
+```
+
+-   Now when we take in a value of Sales, and place it into our linear combination, then we are returned with some "probability" between 0 (Home Office/Corporate) and 1 (Consumer). $$
+    \hat{in\_category} = \log\left(\frac{p}{1 - p}\right) = -0.792845 +0.001918816\times\texttt{sales}
+    $$
+
+```{r}
+# these coefficients come from the model
+sigmoid <- \(x) 1 / (1 + exp(-(-0.792 + 0.00191 * x)))
+
+
+Superstore_binary |>
+  ggplot(mapping = aes(x = Sales, y = in_category)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_function(fun = sigmoid, color = 'blue', linewidth = 1) +
+  labs(title = "Modeling a Binary Response with Sigmoid") +
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  theme_minimal()
+```
+
+-   Here we can see that this sigmoid function gives us insight into the likelihood that an product sold is in category(Office supplies/Technology), tends to give more sales value.
+
+
+
+
+----
+
+**3. Part 3 -** Consider a transformation for any explanatory variable, and illustrate why you need the transformation (or why you do not)
+
+Lets consider the - 
+-   **Response variable = Profit** 
+-   **Explanatory Variable = Sales**
+
+```{r}
+Superstore_binary |>
+  filter(Profit >=0)|>
+  ggplot(mapping = aes(x = Profit)) +
+  geom_histogram(color = 'white') +
+  labs("Histogram of Profit ") +
+  theme_hc()
+
+```
+For example, Profit (or, positive dollar amounts in general) typically resembles slightly a Poisson distribution.
+Therefore we further try to do a log over Profit to view the data better. Also, trying to check only on profits and not losses hence filter condition of Profit >= 0.
+
+```{r}
+Superstore_binary |>
+  filter(Profit >=0) |>
+  ggplot(mapping = aes(x = Sales, y = log(Profit))) +
+  geom_point(shape = 'O', size = 3) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Log(Price) vs. Sales") +
+  theme_minimal()
+```
+
+-   From the above graph, it doesnt seem like a great idea of doing a log over Profit.It just messes the data more. Hence trying to do transformation on explanatory variable i.e. Sales. 
+-   But first will plot the variables to understand their nature.
+
+
+```{r}
+
+model <- lm(Profit ~ Sales,
+            filter(Superstore_binary, Profit >=0))
+
+
+
+rsquared <- summary(model)$r.squared
+
+    Superstore_binary |>
+      filter(Profit >=0) |>
+  ggplot(mapping = aes(x = Sales, 
+                       y = Profit)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed',
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Profit vs. Sales",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+There is a clear monotonic relationship between $x$ (sales) and $y$ (profit) here, "as $x$ increases, $y$ increases." In this case the relationship is quadratic, so $y$ could be modeled non-linearly as=
+$$
+y = ax^2 + bx + c + \varepsilon
+$$
+
+From the plot, we could also determine that the there is a quadratic relation between (x)Sales and (y)Profit.
+Further transforming the (sales)explanatory variable to create an effective regressive model and plotting the same.
+
+```{r}
+Superstore_binary_filt <- Superstore_binary |>
+  mutate(sales_sqft_2 = Sales ^ 2)  # add new variable
+
+model <- lm(Profit ~ sales_sqft_2 + Sales,
+            filter(Superstore_binary_filt))
+
+rsquared <- summary(model)$r.squared
+
+Superstore_binary_filt |>
+      filter(Profit >=1) |>
+  ggplot(mapping = aes(x = sales_sqft_2, 
+                       y = Profit)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed',
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = " Profit vs. (Sales) ^ 2",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+
+The above plot of $y$ vs. $x$ determines the transformation on $x$.i.e. it looks like $y \approx \sqrt{x}$, hence we created a new variable in our data frame like sales_sqft_2 = sqrt(sales). Not much with respect to data has changed but the line is trying to be a linear one.

@@ -1,0 +1,637 @@
+# Hypothesis Testing
+
+In this notebook, we'll discuss a few different topics:
+
+-   Empiricism vs. Rationalism
+-   Hypothesis Testing Paradigms
+-   Null Hypothesis
+-   Type I vs. Type II Error
+-   p-value
+-   AB Testing
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(effsize)
+library(pwrss)
+```
+
+## Empiricism vs. Rationalism
+
+Over the years, there have been many different ways to understand our universe, from superstition, to asking other people, to science. But, in general, most of these methods could fall into one of the following categories:
+
+-   Empiricism: Draw conclusions based strictly on **observations** and experience.
+-   Rationalism: Mentally reason your way through arguments to dispel any **doubt**.
+
+When we combine these two methods, we arrive at a pure form of epistemology:
+
+1.  Experience the world
+2.  Think, and devise a hypothesis
+3.  Seek evidence *against* your hypothesis
+4.  Repeat.
+
+This is the basic format for hypothesis testing. Note a subtle but very important distinction: **in statistics, we never prove anything; we can only aim to disprove.** True, in mathematics (and theoretical sciences), one can prove theorems and laws, but when applied to reality, theory will always be challenged by Nature and the great unknown.
+
+## Hypothesis Testing Paradigms
+
+*(To dispel common misconceptions about hypothesis testing, here is a bit of history...)*
+
+Hypothesis testing began more loosely as a "test for significance," and it was mostly a product of the work of R.A. Fisher (known as the father of modern statistics), William Sealy Gosset (i.e., "Student" of "Student's T"), and Karl Pearson (pioneer of mathematical statistics). In this paradigm, we have a "status quo" understanding of the world called a **null hypothesis**, and we use a probabilistic calculation called the **p-value** to measure evidence against it, yielding a level of confidence.
+
+Later, Pearson's son Egon Pearson and another statistician, Jerzy Neyman, developed the Neymon-Pearson paradigm, so named "hypothesis testing", with the aim of being more actionable, and objective than the the prior version. This introduced language like "alternative hypothesis", "power", and more explicit guidelines for how a hypothesis can be rejected.
+
+These two paradigms are often either confused, combined, or conflated with one another. In general, **Fisher's "significance testing" is the preferred**, but we will touch on the Neyman-Pearson paradigm just to define terms and techniques you may hear or use later on.
+
+## Null Hypothesis
+
+First, **a hypothesis is a statement about a population parameter**. Again, parameters are unknown numerical values that describe a population.
+
+[Fisher's definition of the null hypothesis](https://archive.org/details/in.ernet.dli.2015.502684/page/n32/mode/1up?q=null+hypothesis) is a bit vague, but we can use his writing to inform a more clear definition:
+
+**A null hypothesis is a *neutral* and *quantitative* statement about a population parameter that *can* be disproved.**
+
+For example:
+
+| Instead of this ...                                                            | Choose this ...                                                                                                        |
+|--------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| *"The average temperature in Arizona is 98 degrees."*                          | *"The average temperature in Arizona this year is equal to the average temperature in Arizona last year."*             |
+| *"3% of students fail the class each year"*                                    | *"The proportion of failing students for the class is 0."*                                                             |
+| *"The BMI for active athletes is better than the BMI for non-athletes."*       | *"The difference in the mean BMI between athletes and no-athletes is 0."*                                              |
+| *"House purchases increase each year"*                                         | *"On average, house sales in a neighborhood during year* $t$ *is equal to its house sales in year* $t-1$*."*           |
+| *"There is a strong correlation between brushing your teeth and oral health."* | *"The average number of cavities for toothbrushers is equal to the average number of cavities for non-toothbrushers."* |
+
+*Note: **you cannot accept a null hypothesis**.*
+
+## EXERCISE
+
+*For this exercise, use [this dataset](https://github.com/leontoddjohnson/i590/tree/main/data/marketing) from the course GitHub repository.*
+
+```{r}
+url_ <- "https://raw.githubusercontent.com/leontoddjohnson/i590/main/data/marketing/marketing.csv"
+marketing <- read_delim(url_, delim = ",")
+```
+
+1.  Clearly define the *population* from which this data is sampled.
+2.  Devise a null hypotheses based on the documentation which incorporates two columns of data.
+3.  Using R, calculate the statistic(s) associated null hypothesis from the sample of data.
+
+```{r}
+print("your code here")
+#view(marketing)
+head(marketing)
+
+
+```
+
+```{r}
+max(marketing$spend)
+min(marketing$spend)
+mean(marketing$spend)
+# Null hypothesis - On an average the spendings done by the company every year is around 50$
+
+#If we can spend < 50$ on ad then <200 clicks
+
+#Average ctr no. display = ctr for display
+
+#Average revenue = avg spend
+
+#Average clicks stays sae as spend increases
+
+unique(marketing$display)``
+```
+
+## Type I and Type II Error
+
+> In this subsection, we expound on the Neyman-Pearson testing paradigm. Again, ***this method is [notpreferred]{.underline}***, but it is still sometimes used in industry, especially when sample sizes are low.
+
+Returning to the `marketing` data, suppose we devise the following null hypothesis:
+
+$$
+H_0: \text{Average daily revenue remains equal for both variations of advertisement.}
+$$
+
+In this case, we have two different sampled distributions of data to consider: (1) revenue for the days with the "display" ad, and (2) revenue for the days with the non-"display" ad.
+
+```{r}
+marketing |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = revenue, 
+                             y = factor(display, levels = c(0, 1), 
+                                        labels = c("Normal", "With Display")))) +
+  labs(title = "Advertisement Effect on Revenue",
+       x = "Revenue (in dollars)",
+       y = "Advertisement Variation") +
+  theme_minimal()
+```
+
+At first glance, it looks like the revenue tends to be higher for days when the advertisement is using the display. But, really what we're looking at is the difference between the average revenue *with* the display and the average revenue *without* the display.
+
+*Note: our data does not reflect simultaneous campaigns which could be paired.*
+
+```{r}
+avg_revenues <- marketing |>
+  group_by(display) |>
+  summarize(avg_revenue = mean(revenue)) |>
+  arrange(display)
+
+avg_revenues
+```
+
+```{r}
+observed_diff <- (avg_revenues$avg_revenue[2] -
+                  avg_revenues$avg_revenue[1])
+paste("Observed Difference: ", observed_diff)
+```
+
+Given this difference and the data we have, **we are interested in whether this is enough evidence against the null hypothesis** stated above.
+
+### Sampling Distribution
+
+By design, all hypothesis tests use a "sampling distribution" of some sort to evaluate "evidence". In our case, since we're looking at a single value (i.e., the simple difference in two averages), we can return again to the Gaussian sampling distribution.
+
+**The sampling distribution always assumes the conditions of the null hypothesis.** In our case, the sampling distribution will be normal with a mean of 0 (i.e., no difference between the two advertisements). We will calculate the standard error by bootstrapping differences in averages between the two data sets.
+
+```{r}
+# the same bootstrapping function from lab_06
+bootstrap <- function (x, func=mean, n_iter=10^4) {
+  # empty vector to be filled with values from each iteration
+  func_values <- c(NULL)
+  
+  # we simulate sampling `n_iter` times
+  for (i in 1:n_iter) {
+    # pull the sample (e.g., a vector or data frame)
+    x_sample <- sample_n(x, size = length(x), replace = TRUE)
+    
+    # add on this iteration's value to the collection
+    func_values <- c(func_values, func(x_sample))
+  }
+  
+  return(func_values)
+}
+```
+
+We just need to define the "difference in averages" function, then input it to get our bootstrapped standard error:
+
+```{r}
+diff_in_avg <- function (x_data) {
+  avg_revenues <- x_data |>
+    group_by(display) |>
+    summarize(avg_revenue = mean(revenue)) |>
+    arrange(display)
+  
+  # difference = revenue_with - revenue_without
+  diff <- (avg_revenues$avg_revenue[2] - 
+           avg_revenues$avg_revenue[1])
+  
+  return(diff)
+}
+
+diffs_in_avgs <- bootstrap(marketing, diff_in_avg, n_iter = 100)
+```
+
+Now, we plot our estimated sampling distribution.
+
+```{r}
+ggplot() +
+  geom_function(xlim = c(-300, 300), 
+                fun = function(x) dnorm(x, mean = 0, 
+                                        sd = sd(diffs_in_avgs))) +
+  geom_vline(mapping = aes(xintercept = observed_diff,
+                           color = paste("observed: ",
+                                         round(observed_diff)))) +
+  labs(title = "Bootstrapped Sampling Distribution of Revenue Differences",
+       x = "Difference in Revenue Calculated",
+       y = "Probability Density",
+       color = "") +
+  scale_x_continuous(breaks = seq(-300, 300, 100)) +
+  theme_minimal()
+```
+
+Now we can compare the difference we calculated vs other (simulated) differences we could have calculated.
+
+### Alternative Hypothesis
+
+The key to the Neyman-Pearson framework is the alternative hypothesis $H_a$.
+
+**The alternative hypothesis the logical antithesis to the null hypothesis.**
+
+$H_a$ must use one of three \<, ≠, \>.
+
+-   When we use \>, we are interested in a **right-tailed** test. Here, the *only* possible outcomes correspond to samples on the right tail of the sampling distribution.
+-   Similarly, with \<, we are interested in a **left-tailed** test, where the *only* possible outcomes correspond to samples on the left tail of the sampling distribution.
+-   With ≠, we are interested in a **two-tailed** test where we may expect samples yielding values on either the left tail or right tail of the sampling distribution.
+
+In our case, it is *possible* that the display ad variation could actually reduce the revenue, so in this case we are interested in a two-tailed test.
+
+> *In general, you should use a two-tailed test unless it is absolutely impossible for a parameter value to be less/greater than the null hypothesized value (e.g., introducing bacteria into a culture).*
+
+### Effect Size
+
+**Effect size quantifies the difference between the null hypothesis and the alternative hypothesis.** You can think of it as a sort of "signal-to-noise" measure for the difference between two situations.
+
+There are multiple measures for [effect size](https://CRAN.R-project.org/package=effsize), but easily the most common and straight forward is [Cohen's D](https://www.rdocumentation.org/packages/effsize/versions/0.8.1/topics/cohen.d), named after the statistician Jacob Cohen. It scales the difference between two means, in terms of their standard deviation:
+
+$$
+d = \frac{\bar{X}_1 - \bar{X}_2}{s}\ ,\quad s=\sqrt{\frac{(n_1 - 1)s_1^2 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}},
+$$
+
+Where $s$ is the "pooled standard deviation", and we subtract 2 in the denominator for the appropriate Bessel Correction (i.e., 2 degrees of freedom).
+
+```{r}
+cohen.d(d = filter(marketing, display == 0) |> pluck("revenue"),
+        f = filter(marketing, display == 1) |> pluck("revenue"))
+```
+
+Roughly, this number can range from a "negligible" effect (i.e., $|d| < 0.2$) to a "large" effect (i.e., $|d| \geq 0.8$). For larger values, hypothesis testing might not be needed at all given the vast difference, whereas small values typically support the effort of hypothesis testing.
+
+> *Note: Cohen's D (along with many other statistics) do not hold up well for small samples of data less than 100.*
+
+### Testing Process
+
+**The aim of any hypothesis test is to measure the evidence against the null hypothesis.** In the Neyman-Pearson paradigm, If there is sufficient evidence against it, we can *reject* the null hypothesis, and *assume* the alternative. Otherwise, if the evidence is not convincing enough, we *fail to reject* the null hypothesis, and *assume* it is valid. Notice, we do not *conclude* or *prove* anything --- at best, we can safely *assume*.
+
+Here, our process for statistical testing roughly follows these steps:
+
+1.  Devise a null hypothesis.
+2.  Infer the distribution of the random variable represented in the null hypothesis.
+3.  Choose a practical and informed False Negative Rate, called the "$\alpha$-level". Let this inform a "critical value" based on whether you're using a two-tailed or one-tailed test.
+    -   If we end up rejecting the null hypothesis, this is the theoretical probability we would have sampled our data given that it was actually "true".
+    -   [**Do not arbitrarily choose a value like 0.05**](https://doi.org/10.1080/00031305.2019.1583913).
+4.  Your null hypothesis should be associated with a difference in parameter values, (e.g., $p_1 - p_2$ or $\mu - 0$). Decide on the *least extreme but most practical* difference worth measuring, and call this $\Delta$.
+    -   This value can be *informed* by an effect size calculation or conversations with co-workers.
+    -   E.g., "we don't need to change our pricing plan until the CTR increases by 0.01, so we'll choose $\Delta = 0.01$".
+5.  Choose a practical and informed False Positive Rate ($\beta$).
+    -   If the difference $\Delta$ is true, what is the likelihood of detecting it with this test?
+6.  Calculate an appropriate sample size using the above measures, and ensure you have enough data before moving forward.
+7.  Run the hypothesis test, and draw conclusions.
+
+### Error Types
+
+The Neyman-Pearson paradigm can be visualized in the following contingency table:
+
++----------------:+:------------------------------:+:------------------------:+
+|                 | Null Hypothesis\               | Null Hypothesis\         |
+|                 | **TRUE**                       | **FALSE**                |
++-----------------+--------------------------------+--------------------------+
+| Reject\         | Type I Error ($\alpha$)\       | Power ($1-\beta$)\       |
+| Null Hypothesis | "False Negative Rate"          | "True Negative Rate"     |
++-----------------+--------------------------------+--------------------------+
+| Fail to Reject\ | Confidence Level ($1-\alpha$)\ | Type II Error ($\beta$)\ |
+| Null Hypothesis | "True Positive Rate"           | "False Positive Rate"    |
++-----------------+--------------------------------+--------------------------+
+
+```{r}
+critical_value <- 2
+delta <- 1.5
+
+f_0 <- function(x) dnorm(x, mean = 0)
+f_a <- function(x) dnorm(x, mean = delta)
+
+ggplot() +
+  stat_function(mapping = aes(fill = 'power'),
+                fun = f_a, 
+                xlim = c(critical_value, 4),
+                geom = "area") +
+    stat_function(mapping = aes(fill = 'alpha'),
+                fun = f_0, 
+                xlim = c(critical_value, 4),
+                geom = "area") +
+  geom_function(mapping = aes(color = 'Null Hypothesis'),
+                xlim = c(-4, 4), fun = f_0) +
+  geom_function(mapping = aes(color = 'Alternative Hypothesis'),
+                xlim = c(-4, 4), fun = f_a) +
+  geom_vline(mapping = aes(xintercept = critical_value,
+                           color = "Critical Value")) +
+  geom_vline(mapping = aes(xintercept = delta,
+                           color = "Delta")) +
+  geom_vline(mapping = aes(xintercept = 0),
+             color = 'gray', linetype=2) +
+  labs(title = "One-Tailed Test Illustration",
+       subtitle = "(Mirror the right side for two-tailed tests.)",
+       x = "Test Statistic",
+       y = "Probability Density",
+       color = "",
+       fill = "") +
+  scale_x_continuous(breaks = seq(-4, 4, 1)) +
+  scale_fill_manual(values = c('lightblue', 'pink')) +
+  scale_color_manual(values = c('darkred', 'darkorange', 'darkblue', 
+                                'darkgreen')) +
+  theme_minimal()
+```
+
+-   **alpha** : $\alpha$ here represents the rejection region. If our observed value falls in this area, we are safe to reject the null hypothesis, and assume the alternative.
+-   **power** : if the alternative were true, by at least a difference of $\Delta$, then $1 - \beta$ (the power) represents the probability we'd detect it within the rejection region.
+    -   E.g., keeping the vertical orange line (our significance level) stationary, visualize moving the alternative hypothesis from right to left (i.e., adjusting $\Delta$). Notice how the power changes.
+
+> *Questions: What happens to this illustration as you increase the sample size? What happens to the power for smaller effect sizes?*
+
+### Sample Size Calculation
+
+There is trade-off between gathering more representable data over time, and deploying the "better" variation, sooner. With AB Testing especially, you'll need to strike a balance between having enough data and being able to make a decision.
+
+The [*pwrss* package](https://cran.r-project.org/web/packages/pwrss/vignettes/examples.html) (imported at the top of this notebook) is specifically built to employ Neyman-Pearson Hypothesis tests, and we can use it to calculate the minimum sample size needed to detect a particular effect size.
+
+Suppose (after conversations with colleagues) we decide the following:
+
+-   a meaningful difference in revenue from the ad equates to \$100.
+-   we've only collected the data we have so far, but we need to know if we need more.
+-   we can accept $\alpha = 0.1$ and require $1 - \beta = .85$.
+
+```{r}
+marketing |>
+  group_by(display) |>
+  summarize(sd = sd(revenue),
+            mean = mean(revenue))
+```
+
+These standard deviations are roughly equal, so we can just use the whole dataset to approximate the overall value. With *pwrss*, we can use a [parametric test](#0) for normally distributed data, or non-parametric tests for other data. As a simple example here, we'll use a t-test. We only need to supply `mu1` and `sd1`, since we're only concerned with the *difference*. `kappa` here is the ratio between the two samples sizes, and we assume they're equal.
+
+```{r}
+test <- pwrss.t.2means(mu1 = 100, 
+                       sd1 = sd(pluck(marketing, "revenue")),
+                       kappa = 1,
+                       power = .85, alpha = 0.1, 
+                       alternative = "not equal")
+
+plot(test)
+```
+
+> *Note: According to the documentation, you could also replace `mu1`* *here* *with a decided upon Cohen's D, and let `sd1 = 1` as default.*
+
+So, here we see that we need at least 34 days of revenue data for each group for our hypothesis test to maintain the strength defined.
+
+## p-value
+
+Let's return to the sampling distribution **assuming the null hypothesis is true**, and compare the difference we calculated to the distribution.
+
+```{r}
+f_sampling <- function(x) dnorm(x, mean = 0, 
+                                sd = sd(diffs_in_avgs))
+
+ggplot() +
+  stat_function(mapping = aes(fill = 'more extreme samples'),
+                fun = f_sampling, 
+                xlim = c(observed_diff, 300),
+                geom = "area") +
+  stat_function(mapping = aes(fill = 'more extreme samples'),
+                fun = f_sampling, 
+                xlim = c(-observed_diff, -300),
+                geom = "area") +
+  geom_function(xlim = c(-300, 300), 
+                fun = f_sampling) +
+  geom_vline(mapping = aes(xintercept = observed_diff,
+                           color = paste("observed: ",
+                                         round(observed_diff, 1)))) +
+  labs(title = "Bootstrapped Sampling Distribution of Revenue Differences",
+       x = "Difference in Revenue Calculated",
+       y = "Probability Density",
+       color = "",
+       fill = "") +
+  scale_x_continuous(breaks = seq(-300, 300, 100)) +
+  scale_fill_manual(values = 'lightblue') +
+  theme_minimal()
+```
+
+The area of the light blue shaded region is the proportion of samples which would have resulted in a difference (improvement) in revenue "more extreme" than the one we calculated. **This is the p-value**. That is,
+
+***Assuming the null hypothesis is true**, the **p-value** is the theoretical probability of sampling data with a statistic more extreme than the one calculated.*
+
+From our bootstrapped data, we can calculate this directly. But first, since we are assuming that the null hypothesis is true, we are only using the bootstrapped samples to simulate standard error (variance of sample means), and we shift the mean to 0 by subtracting the bootstrapped mean from each value.
+
+```{r}
+# "demean" the bootstrapped samples to simulate mu = 0
+diffs_in_avgs_d <- diffs_in_avgs - mean(diffs_in_avgs)
+
+#paste("p-value ", 
+#      sum(observed_diff < diffs_in_avgs_d) /
+#        length(diffs_in_avgs_d))
+
+paste("p-value ", 
+      sum(abs(observed_diff) < abs(diffs_in_avgs_d)) /
+        length(diffs_in_avgs_d))
+```
+
+So, we say *"assuming the display ad has no effect on revenue, then 17 of 100 samples this large would yield a difference in revenue of 93.6 or more."*
+
+In other words (assuming there is no effect), would you be surprised if 17% of all (theoretical) samples reflect a difference of 93.6 or more? This is where you use your sample size, judgement, and discussions to decide if this is sufficient evidence to reject the null hypothesis, and claim that there is a difference.
+
+### General p-value Calculation
+
+In general, we follow the following steps to calculate the p-value for some hypothesis test:
+
+1.  Determine the kind of statistic represented in the null hypothesis. E.g., difference in proportion, difference in means/medians, counts, etc.
+2.  Research the appropriate [**test statistic**](https://en.wikipedia.org/wiki/Test_statistic#Common_test_statistics) $\tau$ for the situation. (Recall, this number will represent the number of standard deviations from the mean your sample of data lands on the sampling distribution, assuming the null hypothesis.)
+3.  Determine whether you are using a two-tailed or one tailed test, and calculate the appropriate area using the appropriate cumulative distribution function (based on the test you choose from step 2).
+    -   We'll see a few examples of R functions that do this for you, below.
+
+### Peeking
+
+**Never calculate a p-value more than once after collecting more data:**
+
+The first p-value calculation pertains to the population from which the samples are drawn, and you get a probability for *that* sample. The second p-value calculation pertains to the same population, but now you're looking at the following probability
+
+$$
+P(\text{last sample} + \text{added rows}) = P(\text{last sample})\cdot P(\text{added rows})
+$$
+
+So, every time you "peek" at the p-value, you are just *decreasing* the last value by some factor. **This increases your chances of a false positive reading!** It deceives you with a smaller p-value, and skews the interpretation of your results. So, it's best simply not to do it, and make a single calculation when you feel you have sufficient data/time left.
+
+## AB Testing
+
+In an "AB Test", we compare statistics of two sampled sub-groups (usually based on some variation) to help us understand if there is a difference between their populations. This kind of thing is typically used to help us make business decisions, such as "which advertisement should we use?"
+
+In our case, we have two variations of advertisements, and we are interested in how they differ.
+
+There are two ways to go about AB Testing:
+
+-   **Post Hoc**: "Here is a bunch of data we collected. Given this information, what course of action would you say is best?"
+-   **A Priori**: "We want to know which course of action is best. So, let's collect some data and run an experiment."
+
+In this class, we focus on Post Hoc analysis, as is the more likely scenario in data scientist positions. We will also use the p-value as our measure for statistical significance, without proposing an alternative hypothesis.
+
+Let's suppose our null hypothesis is:
+
+$$
+H_0: \text{An ad's average click through rate is not affected by the display}
+$$
+
+### Direct Simulation Test
+
+In fact, we've already seen an example of the direct simulation test above in our explanation of the p-value, testing for a difference in revenue between the two groups.
+
+### EXERCISE
+
+Repeat the direct simulation test described above, but this time for the difference in average click through rate between the two variations. Is there enough evidence against the null hypothesis?
+
+```{r}
+print("your code here")
+```
+
+### Normal Test of Equal Proportions
+
+> *With small data sets, there is not much information to inform what the sampling distribution looks like. In those cases, Student's T-Distribution approximates the normal distribution with wider tails for lower* $n$ *values. In our example though, we have plenty of impressions (over 1K per day), and this is expected as data sets are far larger than they were when Gossett developed the T-Distribution in the first place.*
+
+Rather than use a bootstrapped sampling distribution to create our test, we could use a parameterized normal curve, based on the statistic represented in the null hypothesis. In our case, we are interested in a difference in proportion. That is:
+
+$$
+H_0: |p_1 - p_0| = 0
+$$
+
+where $p_1$ is the CTR for ads with the display, and $p_0$ is the CTR for ads without it. So, our test statistic is
+
+$$
+z=\frac{(\hat{p}_1 - \hat{p}_2)}{\sqrt{\hat{p}(1 - \hat{p})(\frac{1}{n_1} + \frac{1}{n_2})}},\quad
+\hat{p}=\frac{x_1 + x_2}{n_1 + n_2}
+$$
+
+Notice, this follows the same form as $s/\sqrt{n}$. The denominator on the left is the pooled variance for proportions.
+
+In R, we can calculate a p-value for this directly, using the clicks and impressions. Note, the average CTR for either group is equal to $(\text{sum of all clicks})/ (\text{sum of all impressions})$.
+
+```{r}
+ctr_trials <- marketing |>
+  group_by(display) |>
+  summarize(successes = sum(clicks),
+            trials = sum(impressions))
+
+ctr_trials
+```
+
+This is the form required for `prop.test`.
+
+```{r}
+prop.test(x = ctr_trials$successes,
+          n = ctr_trials$trials,
+          alternative = "two.sided")
+```
+
+The outcome we're interested in is the p-value, and it is extremely small, so if the CTRs were the same, a dataset like ours would be *incredibly* rare. But, that sounds surprising given the number of data points we've collected. So, this seems like enough evidence against the null hypothesis to reject the claim that the display doesn't affect the CTR.
+
+### Chi-Squared Test
+
+The Chi-Squared Test, or $\chi^2$ test is typically understood as a test for "Goodness of Fit". So, given what we'd **expect** to see from some distribution, how well do our empirical **observations** fit that distribution?
+
+Imagine many (infinitely many?) experiments run from the same population; each with $n$ different (sampled) observations, where for each observation $O_i$, there is an expected value $E_i$ based on some predetermined parameters. Due to [results](https://arxiv.org/pdf/1808.09171.pdf) by DeMoivre, Laplace, and eventually Karl Pearson, we know that the following variable is distributed among these experiments according to the $\chi^2$ distribution:
+
+$$
+\begin{aligned}    \chi^2_* &= \frac{(O_1 - E_1)^2}{E_1} + \frac{(O_2 - E_2)^2}{E_2} + \dots + \frac{(O_n - E_n)^2}{E_n} \newline    \chi^2_* &= \sum_{i=1}^n \frac{(O_i - E_i)^2}{E_i}\end{aligned}
+$$
+
+We call this $\chi^2_*$ our "test statistic". **For discrete, categorical factor variables**, the null hypothesis for the $\chi^2$ test is:
+
+$$
+H_0: \text{Factor A is independent of Factor B}
+$$
+
+So, suppose we are interested in whether the transaction
+
+$$
+H_0: \text{CTR is independent of the ad variation}
+$$
+
+To test this hypothesis, we create a contingency table:
+
++-------------+:-----------:+:-----------------:+:-------------:+
+| *Observed\  | Successes\  | Failures\         | Totals\       |
+| Values*     | (Clicks)    | (Non-Clicks)      | (Impressions) |
++-------------+-------------+-------------------+---------------+
+| Variation A | $C_A$       | $I_A - C_A$       | $I_A$         |
++-------------+-------------+-------------------+---------------+
+| Variation B | $C_B$       | $I_B - C_B$       | $I_B$         |
++-------------+-------------+-------------------+---------------+
+| Totals      | $C_A + C_B$ | $N - (C_A + C_B)$ | $N$           |
++-------------+-------------+-------------------+---------------+
+
+*Note: In our case, we only have **two** levels for each factor. But, **this test will work with any number of rows and columns** (e.g., testing whether someone's hair color is independent of their eye color).*
+
+The test itself uses this table (excluding the totals) and compares it to another one which uses *expected* values, based on the assumption that the columns are independent of the rows.
+
+In R, though, we can simply calculate the table, then run the test.
+
+```{r}
+ctr_table <- marketing |>
+  group_by(display) |>
+  summarize(clicks = sum(clicks),
+            non_clicks = sum(impressions) - sum(clicks))
+
+ctr_table
+```
+
+The $\chi^2$ test only requires the 2x2 contingency table with applicable values, i.e., here, the `clicks` and `non_clicks` columns. The `display` column (which we used in the group by) is really just a label for the rows.
+
+```{r}
+chisq.test(select(ctr_table, clicks, non_clicks))
+```
+
+Again, we have the same low p-value that was expected from the last set of hypothesis tests.
+
+### EXERCISE
+
+Starting with the totals column and row from the above table, create the contingency table of *expected* values for the click through rate.
+
+*[... your table here ...]*
+
+### Fisher's Exact Test
+
+Consider the following 2x2 contingency table:
+
+|                   |              |              |                     |
+|-------------------|:------------:|:------------:|:-------------------:|
+| *2x2 Contingency* |  Successes   |   Failures   |       Totals        |
+| Group A           | $\mathbf{a}$ | $\mathbf{b}$ |       $a + b$       |
+| Group B           | $\mathbf{c}$ | $\mathbf{d}$ |       $c + d$       |
+| Totals            |   $a + c$    |   $b + d$    | $n = a + b + c + d$ |
+
+Given a **2x2 table** with the row and column sums defined (the sums, *not* in bold), and the assumption that every number in the table is a non-negative integer (e.g., 0, 1, 2, ...), then **there is necessarily a finite number of ways that the (bold) cells could manifest.** In fact, R.A. Fisher proved that the probability of obtaining any one of these ways can be represented by the [hypergeometric distribution](https://en.wikipedia.org/wiki/Hypergeometric_distribution).
+
+$$
+\displaystyle p=\frac{\displaystyle{{a+b} \choose{a}}{{c+d} \choose{c}}}{\displaystyle{{n} \choose{a+c}}}
+$$
+
+Now, remember that the margin totals (not bold) are fixed. This means that we only need **one** (bold) number to determine the rest of the (bold) cell values. E.g., if we know $\mathbf{a}$, we can easily calculate $\mathbf{b} = (a + b) - \mathbf{a}$, and then do the same for $\mathbf{c} = (a + c) - \mathbf{a}$, and then analagously find $\mathbf{d} = (c + d) - \mathbf{c}$. *Note: This is exactly what we mean by "degrees of freedom" for tests like this or the Chi-Squared test; e.g., this table has exactly 1 degree of freedom.*
+
+So, it suffices to say that the probability $p$ represents the probability that the upper-left cell (we could have chosen any of them) is equal to $\mathbf{a}$, so we would say
+
+$$
+p = P(X = \mathbf{a}) \sim \text{Hypergeometric}(X)
+$$
+
+where $X$ is the upper left cell value, modeled by a hypergeometric distribution.
+
+With all of this in mind, we can follow these mental steps:
+
+1.  When we say *"the margin totals (not bold) are fixed"*, we are also saying that the Success/Failure of a trial is *independent* of the group, which is exactly our $H_0$ null hypothesis.
+2.  We know we can calculate $p(X=\mathbf{a})$, but we can also calculate the probabilities of "more extreme" tables, $p(X = \mathbf{a} - 1)$, and $p(X = \mathbf{a} - 2)$, ..., et cetera.
+3.  When we sum these probabilities, we have the probability of attaining *"a more extreme table"* assuming $H_0$. This final sum our p-value.
+
+*Note: **The Fisher's Exact Test is only for 2x2 contingency tables of "count" data**.*
+
+In R, we can use the same contingency table from above:
+
+```{r}
+ctr_table
+```
+
+```{r}
+fisher.test(select(ctr_table, clicks, non_clicks))
+```
+
+The odds ratio here is the probability of a success for Group A over the probability of a success for Group B:
+
+$$
+\text{odds}(A, B) = \frac{P(A \to \text{success})}{P(B \to \text{success})} = \frac{a / a + c}{b / b + d}
+$$
+
+-   If the odds is 1, we have an equal chance of success for either group, and they are independent.
+-   If the odds is $1 + k$ (where $k$ is some positive decimal value) then the chance of success for $A$ is $100\cdot k\%$ higher than for $B$ (e.g., if the odds were 1.2, then we have *"20% higher"*).
+-   If the odds is $k < 1$, then the chance of success for $A$ is $k\%$ of the probability for $B$. This is our case, where the CTR (chance of success) for non-display ads is 65% that of the display ads.
+
+Again, we have the low p-value, and we can draw the same conclusion.
+
+## General Caveats
+
+-   You cannot "accept" a hypothesis
+-   The p-value is not the probability of $H_0$
+-   Statistical significance is not practical significance
+-   Always remember, **your sample may be the anomaly!**

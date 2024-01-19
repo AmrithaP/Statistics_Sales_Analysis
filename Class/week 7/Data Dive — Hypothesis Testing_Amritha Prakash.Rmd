@@ -1,0 +1,375 @@
+---
+title: "Data Dive - Hypothesis Testing"
+author: "Amritha Prakash"
+date: "2023-10-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 7
+
+### Task(s)
+
+(The purpose of this week's data dive is for you to explore hypothesis testing with your dataset.)
+
+-   Part 1: Devise at least two different null hypotheses based on two different aspects (e.g., columns) of your data. For each hypothesis:
+
+    -   Come up with an alpha level, power level, and minimum effect size, and explain why you chose each value. 
+    -   Determine if you have enough data to perform a Neyman-Pearson hypothesis test. If you do, perform one and interpret results. If not, explain why.
+    -   Perform a Fisher's style test for significance, and interpret the p-value.
+    -   So, technically, you have two hypothesis tests for each hypothesis, equating two four total tests.
+
+-   Part 2: Build two visualizations that best illustrate the results from the two pairs of hypothesis tests, one for each null hypothesis.
+
+------------------------------------------------------------------------
+
+### **Read the Data**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(tidyverse)
+library(dplyr)
+library(stats)
+```
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+------------------------------------------------------------------------
+
+**1. Part 1 -**Devise at least two different null hypotheses based on two different aspects (e.g., columns) of your data. For each hypothesis
+
+1.  **Null Hypothesis** -
+
+```{r}
+    sales_total <- Superstore_data |> group_by(Category) |>
+                  summarise(count= n(),Total_sales = sum(Sales),
+                  .groups = 'drop') |>   arrange(desc(Total_sales))
+    tail(sales_total)
+```
+
+```{r}
+sales_total |>
+  ggplot(mapping = aes(x=Category, y= Total_sales, fill= Category )) +
+  geom_bar(stat='identity') +
+  geom_text(aes(label = Total_sales), position = position_stack(vjust = 0.5)) +
+  theme_minimal()+
+  labs(title =" Total Sales based on Category",  y = "Total Sales")
+```
+
+   -   Considering the various categories under which the products are sold and Total sales in each category, to be somewhat similar for the year of 2016.
+   -   Taking 2 categories for the purpose of generating a Null Hypothesis. i.e. Technology and Office Supplies. The reason for picking Technology and Office Supplies are -  Technology because plenty of products are widely being used all around the world. Office supplies because each day a lot of companies are opening and growing to expand.
+   -   Let us assume the first Null Hypothesis to be :  Average Sales of Technology = Average Sales of Office Supplies.
+
+$$
+H_0: \text{Average Sale remains equal for 2 type of categories (i.e Technology and Office Supplies) within products.}  
+$$ 
+
+$$
+H_0: \text{AvgSales_tech = AvgSales_offsupplies}  
+$$
+
+   -   **Alpha Level** -$\alpha$ here represents the rejection region. If our observed value falls in this area, we are safe to reject the null hypothesis, and assume the alternative.
+   -   The alpha level $\alpha$, represents the probability of making a Type I error, which is rejecting the null hypothesis when it is actually true. 
+   -   So taking the $\alpha$ value to be 0.05, so that False negative rate (i.e. Null hypothesis is true and the hypothesis is rejected) is low and Null Hypothesis becomes true for both the categories - Tech and Office Sales.
+    
+```{r}
+   alpha <- 0.05
+```
+    
+    
+   -   **Power Level ** (1-$\beta$) here represents the Power i.e. True Negative Rate, which is the probability of Rejecting a Null Hypothesis when it is actually False. So we would want this to happen, such that right predictions are obtained (i.e., avoiding a Type II error). Lets assume it to be 0.80. Such that we obtain an appropriate result.
+   
+```{r}
+    power <- 0.8
+```
+
+
+   - **Minimum Effect size** - It is the smallest difference in average between sales for each of the category, for which we want to detect from our test. Let us assume that to be around 100$. i.e. Minimum difference between average of sales in tech and office supplies.
+```{r}
+    min_effect_size <- 100
+```
+
+
+-   **Sample size calculation**: 
+    -   To determine if I have enough data to perform a Neyman-Pearson hypothesis test.
+    -   Making use of pwr libarary, to calculate the sample size. This helps in determining how many observations are needed to achieve a certain level of power to detect a specific effect size with a specified significance level.
+    
+```{r}
+   #install.packages("pwr")
+   library(pwr)
+```
+
+
+```{r}
+    # Assuming you have access to the population standard deviation
+    population_sd <-  sd(Superstore_data$Sales)
+
+    # Calculate the required sample size
+    sample_size <- pwr.t.test(d = min_effect_size / population_sd, sig.level = alpha, power = power, type = "two.sample")
+
+    # Print the required sample size
+    sample_size$n
+```
+  
+   -   From above sample size calculation, it is about 611. Since each of the categories have sufficient count of data. i.e. Tech = 1847, Office Supplies = 6026
+   -   So I believe I can implement Neyman-Pearson hypothesis test. 
+
+-   **Neyman-Pearson Test**:
+
+    ```{r}
+    tech_sales <- Superstore_data$Sales[Superstore_data$Category == "Technology"]
+    office_sales <- Superstore_data$Sales[Superstore_data$Category == "Office Supplies"]
+
+    # Performing a two-sample t-test
+    t_test_result <- t.test(tech_sales, office_sales)
+
+    # Print t-test results
+    print(t_test_result)
+    ```
+    ```{r}
+    # Interpret the results
+    if (t_test_result$p.value < alpha) {
+      cat("Reject the null hypothesis. There is a significant difference in average sales between Technology and Office products.")
+    } else {
+      cat("Fail to reject the null hypothesis. There is no significant difference in average   sales between Technology and Office products.")
+    }
+
+    ```
+    
+-   As per the result, We need to reject the Null Hypothesis as there is a large difference between the average of sales in both category -> Technology and Office Supplies. If we reject the Null hypothesis then the alternate hypothesis can be considered as True, which is - Average sales of tech is not equal to Average sales of Office Supplies.
+-   As per the alternate Hypothesis, We cant determine if the average sales done on both the categories will remain 
+
+- **Fishers Style Test** :
+   -   Perform a Fisher's style test for significance, and interpret the p-value.
+```{r}
+       # Filter the data to only include rows where the ship mode is Same Day or Standard Class
+contingency_table <- Superstore_data |>
+  filter(Category == "Technology" | Category == "Office Supplies")
+
+# Perform the Wilcox on rank sum test
+wilcox.test(Sales ~ Category, data = contingency_table, alternative = "two.sided")
+```
+    
+   -   The p-value is very very small, which is lesser than the alpha level of 0.05. Therefore, provides strong evidence that the null hypothesis is false. In this case, the null hypothesis is that there is no difference in average profit between different Categories, namely Technology and Office Supplies
+
+
+   -   Used the wilcox test above because was getting an error with Fishers exact test. 
+   
+   -   Further able to solve the error for Fishers Exact Test,Have added the code below and commented the same. I am not quite sure on the reason but have added the code. As per the error message even tried making the values finite by rounding it off. But still observe the error.
+    ```{r}
+    contingency_table <- Superstore_data |>
+    group_by(Category) |>
+      filter(Category == "Technology" | Category == "Office Supplies" ) |>
+    summarise(sales = round(mean(Sales))) 
+
+   contingency_table
+    ```
+    
+    
+    ```{r}
+  
+    # Perform the Fisher's exact test
+#fisher.test(contingency_table , alternative = "two.sided")
+    # fisher.test(contingency_table$Category, contingency_table$sales , alternative = "two.sided")
+    ```   
+
+   
+    
+**2. Part 2 -** - Build a visualizations that best illustrate the results from the two pairs of hypothesis tests.
+    
+    
+```{r}
+
+    count_category <- Superstore_data |> group_by(Category) |>
+                  summarise(Category_count=n(),Total_sales = sum(Sales), Average_Sales = mean(Sales),
+                  .groups = 'drop') |>   arrange(desc(Category_count))
+    tail(count_category)
+
+
+
+# Create a bar chart
+ggplot(contingency_table, aes(x = Category, y = sales, fill = Category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Sales by Product Category", x = "Category", y = "Average Sales") +
+  theme_minimal()
+```
+
+   -   From the above plot, can see that Average Sales of Office Supplies is far less than what it is for the Technology. So can say that the idea of rejecting Null hypothesis stating the difference between both is 0, is totally sensible. That can be clearly seen in the above plot.
+
+   -   Box plot also helps visualize the Sales for Tech and Office Supplies better. It is spread across the range for both technology and Sales.
+```{r}
+    count_box <- Superstore_data |>
+  filter(Category == "Technology" | Category == "Office Supplies")
+    tail(count_box)
+    
+    ggplot(count_box, aes(x = Category, y = Sales)) +
+  geom_boxplot() +
+  labs(title = " Sales by  Catgeory", x = "Category", y = "Sales") +
+  theme_minimal()
+```
+
+
+----------
+----------
+
+2. Null hypothesis -
+
+
+```{r}
+    profit_mean <- Superstore_data |> group_by(Ship.Mode) |>
+                  summarise(count= n(),Mean_Profit = mean(Profit),
+                  .groups = 'drop') |>   arrange(desc(Mean_Profit))
+    tail(profit_mean)
+```
+
+-   Considering the various shipmode under which the products are sold and Total profit in each shipmode, to be somewhat similar.
+    
+
+-   Let us assume the first Null Hypothesis to be :  There is no difference in average profit between different ship modes, here Same Day and Standard Class. 
+
+$$
+H_0: \text{Average Profit remains equal for 2 type of shipmode (i.e Same Day and Standard Class) within products.}  
+$$ 
+
+$$
+H_0: \text{AvgProfit_Sameday = AvgProfit_Standard}  
+$$
+
+-   **Alpha Level** -$\alpha$ here represents the rejection region. If our observed value falls in this area, we are safe to reject the null hypothesis, and assume the alternative.
+-    The alpha level $\alpha$, represents the probability of making a Type I error, which is rejecting the null hypothesis when it is actually true. 
+-    So taking the $\alpha$ value to be 0.05, so that False negative rate (i.e. Null hypothesis is true and the hypothesis is rejected) is low and Null Hypothesis becomes true for both the ship Mode - Same day and Standard Class.
+    
+```{r}
+   alpha <- 0.05
+```
+    
+    
+-   **Power Level ** (1-$\beta$) here represents the Power i.e. True Negative Rate, which is the probability of Rejecting a Null Hypothesis when it is actually False. So we would want this to happen, such that right predictions are obtained (i.e., avoiding a Type II error). Lets assume it to be 0.80. Such that we obtain an appropriate result.
+
+```{r}
+    power <- 0.8
+```
+
+
+-   **Minimum Effect size** - It is the smallest difference in average between sales for each of the category, for which we want to detect from our test. Let us assume that to be around 100$ Profit. i.e. Minimum difference between average of profit for shipmode Same Day and Standard Class.
+
+```{r}
+    min_effect_size <- 100
+```
+
+
+-    **Sample size calculation**: 
+    -   To determine if I have enough data to perform a Neyman-Pearson hypothesis test.
+    -   Making use of pwr libarary, to calculate the sample size. This helps in determining how many observations are need to achieve a certain level of power to detect a specific effect size with a specified significance level.
+    
+```{r}
+   #install.packages("pwr")
+   library(pwr)
+```
+
+
+```{r}
+    # Assuming you have access to the population standard deviation
+    population_sd <-  sd(Superstore_data$Profit)
+
+    # Calculate the required sample size
+    sample_size <- pwr.t.test(d = min_effect_size / population_sd, sig.level = alpha, power = power, type = "two.sample")
+
+    # Print the required sample size
+    sample_size$n
+```
+   -   From above sample size calculation, it is about 87. Since each of the ship mode have sufficient count of data. i.e. Same Day = 543, Standard Class = 5968
+   -   So I believe I can implement Neyman-Pearson hypothesis test. 
+
+-   **Neyman-Pearson Test**:
+    ```{r}
+    tech_sales <- Superstore_data$Sales[Superstore_data$Ship.Mode == "Same Day"]
+    office_sales <- Superstore_data$Sales[Superstore_data$Ship.Mode == "Standard Class"]
+
+    # Performing a two-sample t-test
+    t_test_result <- t.test(tech_sales, office_sales)
+
+    # Print t-test results
+    print(t_test_result)
+    ```
+    ```{r}
+    # Interpret the results
+    if (t_test_result$p.value < alpha) {
+      cat("Reject the null hypothesis. Vast difference in average sales between Technology and Office products.")
+    } else {
+      cat("Fail to reject the null hypothesis. There is not much difference in average sales between Technology and Office products.")
+    }
+
+    ```
+    
+-    As per the result, We need to Accept the Null Hypothesis as there is a less difference between the average of profit in both ship modes -> Same Day and Standard Class.  
+-    In other words, the average profit for Same Day shipping is not significantly higher than the average profit for Standard Class shipping.
+
+
+-   **Fishers Style Test** :
+    -   Perform a Fisher's style test for significance, and interpret the p-value.
+
+```{r}
+    # Filter the data to only include rows where the ship mode is Same Day or Standard Class
+contingency_table <- Superstore_data |>
+  filter(Ship.Mode == "Same Day" | Ship.Mode == "Standard Class")
+
+# Perform the Wilcoxon rank sum test
+wilcox.test(Profit ~ Ship.Mode, data = contingency_table, alternative = "two.sided")
+```
+   -   The p-value is 0.4238, which is greater than the alpha level of 0.05. Therefore, we accept the null hypothesis and conclude that there is a not a significant difference in average profit between the two ship modes.
+
+   -   Used the wilcox test for testing significance above, because was getting an error with Fishers exact test. Have added the Fishers exact code below and commented the same.
+```{r}
+    library(stats)
+
+    contingency_table <- 
+      Superstore_data |>
+  filter(Ship.Mode == "Same Day" | Ship.Mode == "Standard Class") |>
+      group_by(Ship.Mode) |>
+  summarise(Mean_profit = round(mean(Profit))) |>
+      table()
+
+    contingency_table
+    # Perform the Fisher's exact test
+   #fisher.test(contingency_table, alternative = "two.sided")
+    fisher.test(contingency_table , alternative = "two.sided", simulate.p.value = TRUE)
+    
+```
+    
+    
+
+    
+**2. Part 2 -**- Build a visualizations that best illustrate the results from the two pairs of hypothesis tests.   
+   -  Bar graph alone helps represent the visualization better
+    
+```{r}
+
+    count_shipmode <- Superstore_data |> group_by(Ship.Mode) |>
+                  filter()  |>
+                  summarise(ShipMode_count=n(),Total_proft = sum(Profit), Average_Profit = mean(Profit),
+                  .groups = 'drop') |>   arrange(desc(ShipMode_count))
+    tail(count_shipmode)
+
+
+
+# Create a bar chart
+ggplot(contingency_table, aes(x = Ship.Mode, y = profit, fill = Ship.Mode)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Profit by Product shipMode", x = "Ship.Mode", y = "Average Profit") +
+  theme_minimal()
+```
+
+From the above plot, can see that Average Profit of Ship mode Standard Class is almost equal to ShipMode - Same Day. So can say that the idea of accepting the Null hypothesis stating the difference between both is 0 is totally sensible. That can be clearly seen in the above plot.
+
+
+    
+
+

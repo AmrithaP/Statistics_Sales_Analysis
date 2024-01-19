@@ -1,0 +1,532 @@
+---
+title: "Data Dive - Probabilities and Anomalies"
+author: "Amritha Prakash"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 3
+
+### **Read the Data**
+
+```{r}
+# Load tidyverse
+library(tidyverse)
+library(dplyr)
+
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+QUESTION\
+
+1.  At least 3 "group by" data frames, and an investigation into each. You'll need to use categorical columns, or one of the cut\_ functions here.\
+
+-   Use the group_by function to group your data into (at least) 3 different sets of groups, each summarizing different variables.\
+
+-   For example, this could be as simple as three data frames which group your data based on three different categorical columns, but summarize the same continuous column. Or, it could be as complex as three different combinations of categorical columns, each illustrating summarizations of different continuous (or categorical columns).\
+
+-   Within each group_by data frame, calculate the expected probability for each group. Maybe assign the lowest probability group an "anomaly" tag, and then translate that back into your original data frame. Draw some conclusions about the numbers you've calculated.\
+
+-   Try to draw a testable hypothesis for why some groups are rarer than others (How might you test this hypothesis?)\
+
+-   Think of different ways to visualize these groups\
+
+### 1.Segment :- 
+
+-   Expected Probability - Segment\
+
+```{r}
+total_records <- nrow(Superstore_data)
+#total_records
+
+
+
+# 1 group_by Segment and expected probability for Segment
+
+Segment_group <- Superstore_data |>
+  group_by(Segment) |>
+  summarise(total_count_segment=n(),
+            .groups = 'drop') |>
+  mutate(Expected_probability_Segment= (total_count_segment/total_records)) #|>
+  #mutate(Segment_Spl_tag = case_When(Expected_probability_Segment>0.519  ~ 'Usual'),)
+
+Segment_group
+  
+
+```
+
+```{r}
+merged_data <- merge(Superstore_data, Segment_group, by = "Segment", all.x = TRUE)
+
+# Define a function to calculate 'Segment_Special_tag'
+Segment_Special_tag <- function(total_count_segment) {
+  if (total_count_segment >= 3020) {
+    return("normal")
+  }else {
+    return("low")
+  }
+}
+
+# Apply the function to create 'Segment_anomaly' column
+merged_data$Segment_Special_tag <- sapply(merged_data$total_count_segment, Segment_Special_tag)
+
+
+# Print the resulting table
+print(merged_data|> select("Segment","Expected_probability_Segment","Segment_Special_tag")|> sample_n(10) )
+
+
+```
+
+Observations -\
+
+-   0.519 is the probability of records in the dataset that have the Segment- Consumer, while the probability of records for corporate and Home office are 0.302 and 0.1783 respectively.\
+
+-   Consumer Segment is seen to be a significant one when it comes to the products bought i.e. Most records are of consumer segment.\
+
+### - To check if we pull a row/data randomly, then which one segment would we observe 
+
+#1.
+
+```{r}
+sample1 <- sample_n(merged_data,1) 
+sample1 |> select("Segment","Expected_probability_Segment","Segment_Special_tag")
+```
+
+From above, can see that the data pulled randomly
+
+#2.
+
+```{r}
+sample2 <- sample_n(merged_data,1) 
+sample2 |> select("Segment","Expected_probability_Segment","Segment_Special_tag")
+```
+
+From above,again can see that the data pulled randomly.
+
+#3.
+
+```{r}
+sample3 <- sample_n(merged_data,1) 
+sample3 |> select("Segment","Expected_probability_Segment","Segment_Special_tag")
+```
+
+
+#4.
+
+```{r}
+sample3 <- sample_n(merged_data,1) 
+sample3 |> select("Segment","Expected_probability_Segment","Segment_Special_tag")
+
+```
+In all those random pulls the Home office must have appeared or not in segments , like very rare. Consumer segments have higher probability in being taken out.
+
+
+## Visualize Segments Group- 
+
+```{r}
+Segment_group |>
+  ggplot(mapping = aes(x=Segment, y = Expected_probability_Segment, color=Expected_probability_Segment, fill=Expected_probability_Segment)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Expected Probability of Segments",
+    x = "Segment",
+    y = "Expected Probability"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+last_plot() +
+  coord_polar()
+```
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Segment, color=Segment, fill=Segment)) +
+  geom_bar() +
+  labs(
+    title = "Total Count by Segment",
+    x = "Segment",
+    y = "Total Count"
+  ) +
+  theme_minimal()
+```
+
+From the above plots, we can see that the visualizations also state that most records are of Consumer segment with highest product purchase.
+Least bought items are from the Home Office segment.
+The reason for Home Office to show least could be that the products purchased for that are least in the entire Country.
+
+\
+
+### 2.Region - 
+
+-   Expected Probability - Region :\
+
+```{r}
+# 2 group_by Region
+Region_group <- Superstore_data |>
+  group_by(Region) |>
+  summarise(total_count_region=n(),
+            .groups = 'drop') |>
+  mutate(Expected_probability_Region= (total_count_region/total_records))
+
+Region_group
+
+
+```
+
+```{r}
+merged_data <- merge(Superstore_data, Region_group, by = "Region", all.x = TRUE)
+
+# Define a function to calculate 'Segment_Special_tag'
+Region_Special_tag <- function(total_count_segment) {
+  if (total_count_segment >= 2323) {
+    return("normal")
+  }else {
+    return("low")
+  }
+}
+
+# Apply the function to create 'Segment_anomaly' column
+merged_data$Region_Special_tag <- sapply(merged_data$total_count_region, Region_Special_tag)
+
+
+# Print the resulting table
+print(merged_data|> select("Region","Expected_probability_Region","Region_Special_tag")|> sample_n(10))
+
+
+```
+
+Observations -\
+
+-   0.3203 is the probability of records in the dataset that have purchased products from Western part of US. Following which we can see East and Central having probability of 0.28 and 0.23 respectively.While Southern part of USA is having comparitively lesser records.\
+
+-   Western and eastern parts having bought the products in more quantity than southern and central parts of US\
+
+## - To check if we pull a row/data randomly, then which one Region would we observe 
+
+#1.
+
+```{r}
+sample1 <- sample_n(merged_data,1) 
+sample1 |> select("Region","Expected_probability_Region","Region_Special_tag")
+```
+
+
+
+#2.
+
+```{r}
+sample2 <- sample_n(merged_data,1) 
+sample2 |> select("Region","Expected_probability_Region","Region_Special_tag")
+```
+
+
+
+#3.
+
+```{r}
+sample3 <- sample_n(merged_data,1) 
+sample3 |> select("Region","Expected_probability_Region","Region_Special_tag")
+
+```
+Here from above pulls, can see that South region has the lowest probability and obtaining that record is 0.1620 times out of the entire dataset
+
+
+Visualize Region Group -
+
+```{r}
+Region_group |>
+  ggplot(mapping = aes(x=Region, y = Expected_probability_Region, color=Expected_probability_Region, fill=Expected_probability_Region)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Expected Probability of Region",
+    x = "Region",
+    y = "Expected Probability"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+last_plot() +
+  coord_polar()
+```
+
+```{r}
+
+ggplot(Region_group, aes(x = Region, y = total_count_region, fill = Region)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Total Count by Region",
+    x = "Region",
+    y = "Total Count"
+  ) +
+  theme_minimal()
+
+```
+
+The observations are seen in the plots above. 
+Most products are bought in the west and East region of US. Followed by Central. South has the least customers with products bought.\
+
+###3.Category -\
+
+-   Expected Probability - Category\
+
+```{r}
+# 3 group_by Category
+Category_group <- Superstore_data |>
+  group_by(Category) |>
+  summarise(total_count_category=n(),
+            .groups = 'drop') |>
+  mutate(Expected_probability_Category= (total_count_category/total_records))
+
+Category_group
+```
+
+```{r}
+merged_data <- merge(Superstore_data, Category_group, by = "Category", all.x = TRUE)
+
+# Define a function to calculate 'Segment_Special_tag'
+Category_Special_tag <- function(total_count_category) {
+  if (total_count_category >= 1848) {
+    return("normal")
+  }else {
+    return("low")
+  }
+}
+
+# Apply the function to create 'Segment_anomaly' column
+merged_data$Category_Special_tag <- sapply(merged_data$total_count_category, Category_Special_tag)
+
+
+# Print the resulting table
+print(merged_data|> select("Category","Expected_probability_Category","Category_Special_tag")|> sample_n(10))
+
+
+```
+
+Observations -\
+- 0.6029 is the probability of records in the dataset that have purchased Office Supply products. Following which we can see Furniture at o.2121 and Technology having probability of 0.1847.
+
+-   So most products bought in US are Office Supplies as per the record count and probability.
+
+## - To check if we pull a row/data randomly, then which one Category would we observe 
+
+#1.
+
+```{r}
+sample1 <- sample_n(merged_data,1) 
+sample1 |> select("Category","Expected_probability_Category","Category_Special_tag")
+```
+
+
+
+#2.
+
+```{r}
+sample2 <- sample_n(merged_data,1) 
+sample2 |> select("Category","Expected_probability_Category","Category_Special_tag")
+```
+
+
+
+#3.
+
+```{r}
+sample3 <- sample_n(merged_data,1) 
+sample3 |> select("Category","Expected_probability_Category","Category_Special_tag")
+```
+
+
+
+#4.
+
+```{r}
+sample4 <- sample_n(merged_data,1) 
+sample4 |> select("Category","Expected_probability_Category","Category_Special_tag")
+```
+Can see that it is pretty difficult to obtain Technology category when picking randomly as its probability is 0.18
+
+
+Visualize Category Group -
+
+```{r}
+Category_group |>
+  ggplot(mapping = aes(x=Category, y = Expected_probability_Category, color=Expected_probability_Category, fill=Expected_probability_Category)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Expected Probability of Category",
+    x = "Category",
+    y = "Expected Probability"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+last_plot() +
+  coord_polar()
+```
+
+```{r}
+
+ggplot(Category_group, aes(x = Category, y = total_count_category, fill = Category)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Total Count by Category",
+    x = "CAtegory",
+    y = "Total Count"
+  ) +
+  theme_minimal()
+
+```
+
+From the above plot, can state a few things -
+i. Office Supplies category has the most purchases
+ii. Furniture and Technology sees the least in Category
+
+
+4.Sub-Category :\
+
+-   Expected Probability - Sub-Category\
+
+```{r}
+# 4 group_by Category and Region
+  Sub_category_group <- Superstore_data |>
+  group_by(Sub.Category) |>
+  summarise(total_count_sub_category=n(),
+            .groups = 'drop') |>
+  mutate(Expected_probability_sub_Category=(total_count_sub_category/total_records))
+
+Sub_category_group
+
+```
+
+Observations -\
+\* There are about 17 products. Each of those having some varied probabilities on how many were bought by each. With Paper and binders having the most probabilities\
+
+-   So most products bought in US are Office Supplies as per the record count and probability.\
+
+Visualize Sub-category Group -\
+
+```{r}
+ Sub_category_group|>
+  ggplot(mapping = aes(x=Sub.Category, y = Expected_probability_sub_Category, color=Expected_probability_sub_Category, fill=Expected_probability_sub_Category)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Expected Probability of Sub-Category",
+    x = "Sub-Category",
+    y = "Expected Probability"
+  ) +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90))
+```
+
+```{r}
+last_plot() +
+  coord_polar()
+```
+
+**QUESTION**\
+\## EXTRA assumption and thoughts-
+
+**Pick 2-3 categorical variables for which you know all possible combinations.**\
+\* Which combinations never show up? Why might that be?\
+\* Which combinations are the most/least common, and why might that be?\
+\* Try (i.e., no need if you can't figure this one out) to find a way to visualize these combinations.\
+
+1.State -\
+-\> In US there are 50 states in USA , so one of the state data is not present at all. The reason for the same not present could be\
+\* Not all records were documented in this dataset, hence the weird observations.\
+
+-\> There are about 49 states\
+
+```{r}
+n_distinct(Superstore_data$State)
+```
+
+-   Top 10 states from where the products are bought -\
+
+```{r}
+state_count<- aggregate(Superstore_data$State,by=list(Superstore_data$State), FUN=length)
+
+top_10_states_count <-state_count %>%
+arrange(desc(x)) %>%
+    slice(1:10) %>%
+  rename (
+    state=Group.1,
+    count=x
+  )
+top_10_states_count
+```
+
+-   States which havent or least bought any products -\
+
+```{r}
+state_count<- aggregate(Superstore_data$State,by=list(Superstore_data$State), FUN=length)
+
+last_10_states_count <-state_count %>%
+arrange(desc(x)) %>%
+    tail(10) %>%
+  rename (
+    state=Group.1,
+    count=x
+  )
+last_10_states_count
+
+```
+
+Reason for the Wyoming & West Virginia having only 1 and 4 products being purchased, could be that\
+--\> Maybe there are not much people residing in those regions\
+--\>or not all records are documented in this dataset, hence the weird observations.\
+
+2.Region\
+-\> There are 4 regions.\
+
+```{r}
+n_distinct(Superstore_data$Region)
+
+```
+
+-\> This covers most of USA.i.e. East, West, Central and South\
+-\> There is no minimum and max, but with respect to Sales we can figure out which Region has min Sales and max Sales.\
+
+```{r}
+aggregate(Superstore_data$Sales, list(Superstore_data$Region), FUN=mean) |>
+  rename (
+    Region=Group.1,
+    Mean_Sales=x
+  ) |>
+arrange(desc(Mean_Sales))
+```
+
+-\> Overall sales is spread around the region. No major max or min in the same.\
+
+-\> Region vs Sales:\
+Sales can be seen most in the southern part of US. While minimum sales is found to be in East.\
+
+```{r}
+
+Superstore_data %>%
+ggplot() +
+  geom_bar(mapping = aes(x = Region, y=Sales,fill = Region),stat = "identity", position="dodge")
+```
+
+-\> Region vs Category vs Sales:\
+
+```{r}
+
+Superstore_data %>%
+ggplot() +
+  geom_bar(mapping = aes(x = Region, y=Sales,fill = Category),stat = "identity", position="dodge")
+```
+
+we can see that Technologies are the costliest items be it any region. South has bought tech products which have a cost greater than \$2000. Followed by Central, West and East region having cost approximately around \$1750, \$1450 and \$1200 respectively.\
+With Office supplies being the 2nd most costly item bought in all regions. But East regions sees similar cost on Office and furniture.\
+
+-   In general, in order to figure out the most and least common points, we can make use of BOX plot visualization as it would allow us to know which are the min and max points, it

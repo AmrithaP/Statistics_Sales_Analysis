@@ -1,0 +1,522 @@
+# Generalized Linear Models, Part 1
+
+-   Transformations
+-   Link functions
+-   Poisson Regression
+-   Logistic Regression
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(broom)
+library(lindia)
+library(car)
+```
+
+## The Concept of GLMs
+
+Strictly linear relationships are quite uncommon in reality, and not all response variables are distributed normally (i.e., by the Gaussiand distribution). That said, we can leverage the power of linear modeling in a *general* way, to cater to most applications. We create these "Generalized Linear Models" (GLMs) using the following adjustments:
+
+1.  **Transformations and Link Functions**: Intentionally manipulating the explanatory and response variables. *(Part 1 --- this notebook)*
+2.  **Maximum Likelihood Estimation**: Redefining our model based on the distribution of the response variable. *(Part 2 --- the next notebook)*
+
+In this notebook, we'll explore the first type of adjustment, and we'll discuss the second type of adjustment in the next notebook.
+
+## Transformations
+
+Let's recall the general form of a linear regression model:
+
+$$
+\hat{y} = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k + \varepsilon
+$$
+
+I.e., we represent $y$ as a combination of linear relationships with each variable $x_i$.
+
+But, sometimes the relationship between $x$ and $y$ is not quite linear. In these cases, we simply need $y$ to *always* increase/decrease as $x$ increases/decreases. (This excludes cases where the relationship between the two looks like a "U" or an "M", etc.) We call these relationships **monotonic**.
+
+**If a relationship is monotonic, we can transform it into one that is linear**. In other words, if we can describe a relationship using one of the two phrases *"as* $x$ *increases,* $y$ *increases"* or *"as* $x$ *increases,* $y$ *decreases"*, then it is monotonic, and it can be transformed into something linear.
+
+To illustrate an example of this, we'll use this [apartments dataset](https://github.com/leontoddjohnson/i590/tree/main/data/apartments) which contains apartments in San Francisco (SF) and New York City (NYC). If an apartment is in SF, then the `in_sf` column will be `1`.
+
+```{r}
+url <- "https://raw.githubusercontent.com/leontoddjohnson/i590/main/data/apartments/apartments.csv"
+
+apts <- read_delim(url, delim = ',')
+view (apts)
+```
+
+### Transforming Explanatory Variables
+
+Let's start with just the NYC apartments, and consider the relationship between the `price` and the `price_per_sqft`. *Note: we are doing **inferential** statistics, so we can ignore the fact that the explanatory variable "contains" the response variable.*
+
+```{r}
+model <- lm(price ~ price_per_sqft,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = price_per_sqft, 
+                       y = price)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Price vs. Price Per Sq. Ft.",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+There is a clear monotonic relationship between $x$ (price per sq. ft.) and $y$ (price) here, *"as* $x$ *increases,* $y$ *increases."* In this case the relationship is *quadratic*, so $y$ could be modeled *non*-linearly as
+
+$$
+y = ax^2 + bx + c + \varepsilon
+$$
+
+for some constants $a$, $b$, and $c$. This is a non-linear relationship between $x$ and $y$ (because of the square next to the first $x$ variable). Now, suppose we create a completely new variable called $x_p = x^2$. Then now, we have a new model:
+
+$$
+y = ax_p + bx + c + \varepsilon
+$$
+
+this model maintains a linear relationship between our new variable $x_p$ and the original $x$. This is called introducing a **polynomial** term (namely, a quadratic term). In this case, we need to keep the original variable, add another column, and include **both** in the model.
+
+```{r}
+apts <- apts |>
+  mutate(price_per_sqft_2 = price_per_sqft ^ 2)  # add new variable
+
+model <- lm(price ~ price_per_sqft_2 + price_per_sqft,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = price_per_sqft^2, 
+                       y = price)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed',
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Price vs. (Price Per Sq. Ft.) ^ 2",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+We can do this with any monotonic relationship between $x$ and $y$. **The plot of** $y$ vs. $x$ will determine the transformation on $x$. If it looks like $y \approx \frac{1}{x}$ then create a new variable in your data frame like `x_inv = 1/x`. Or, if it looks like $y \approx \sqrt{x}$, then create a new variable in your data frame like `x_sqrt = sqrt(x)`, and so on.
+
+### Power Transformation on the Response
+
+Recall that another assumption on the linear regression model is the consistency of variance in residuals. We can already see by the "funnel" shape of the plots above that our errors are unlikely to be consistent, and also unlikely to be normally distributed about 0. Consider the simple model again, with just `price` and `price_per_sqft`.
+
+```{r}
+model <- lm(price ~ price_per_sqft,
+            filter(apts, in_sf == 0))
+
+plots <- gg_diagnose(model, plot.all = FALSE)
+plot_all(plots[c('res_fitted', 'qqplot')], max.per.page = 1)
+```
+
+Notice a few things:
+
+-   **(Residual Plot) the variance in residuals is not consistent across predicted values.** Instead, lower residuals tend to be closer to zero than larger values.
+-   **(QQ Plot) the large residuals stray from the normal distribution.** I.e., the residuals are not approximately normal (if they were, they'd lie on the red line.)
+
+For these situations, we can transform the *response* variable $y$ with a general **Power Transformation**. This method adjusts the scale of these residuals, and usually results in a more consistent variance and normality. The most straightforward (and most common) method is to use the Box-Cox Transformation.
+
+$$
+z = \frac{(y + \gamma)^\lambda - 1}{\lambda}\ ,\quad y + \gamma > 0
+$$
+
+*(Where* $\gamma$ *is some value such that* $y + \gamma$ *is always strictly **positive**. E.g., if* $y$ *is always positive anyway, like our `price` column, then* $\gamma = 0$ *is fine.)*
+
+With this method, there is an optimal $\lambda$ value such that the model is best specified.
+
+-   When $\lambda \approx 0$, it can be shown that this function approaches $\log(y)$, so the this becomes the best transformation
+-   When $\lambda \approx 1/2$, then the $\sqrt{y}$ is usually a sufficient transformation
+-   If $\lambda \approx 1$, no transformation is needed, and if $\lambda \approx -1$, you can use $\frac{1}{y}$.
+
+```{r}
+pT <- powerTransform(model, family="bcPower")
+pT$lambda
+```
+
+This number is pretty close to 0, so we can use the log transform.
+
+```{r}
+apts <- apts |>
+  mutate(log_price = log(price))  # calculate log_y
+
+model <- lm(log_price ~ price_per_sqft,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = price_per_sqft, 
+                       y = log(price))) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed',
+              se = FALSE) +
+  labs(title = "Price vs. (Price Per Sq. Ft.) ^ 2",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+This model maintains a linearity, but it also has more normal and consistent residuals.
+
+```{r}
+plots <- gg_diagnose(model, plot.all = FALSE)
+plot_all(plots[c('res_fitted', 'qqplot')], max.per.page = 1)
+```
+
+### EXERCISE
+
+Can you find (or create) other columns of data in the `apts` dataset which might need some transformation for linear modeling? Why?
+
+```{r}
+# Price vs Elevation
+
+model <- lm(price ~ elevation,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = elevation, 
+                       y = price)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Price vs. elevation",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+
+pT <- powerTransform(model, family="bcPower")
+pT$lambda
+```
+
+```{l}
+```
+
+```{r}
+
+plots <- gg_diagnose(model, plot.all = FALSE)
+plot_all(plots[c('res_fitted', 'qqplot')], max.per.page = 1)
+```
+
+```{r}
+# Bed vs Sqft
+apts <- mutate(apts, bed_1=beds + 1)
+
+model <- lm(bed_1 ~ sqft,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = sqft, 
+                       y = beds)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Price vs. elevation",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+
+pT <- powerTransform(model, family="bcPower")
+pT$lambda
+```
+
+```{r}
+model <- lm(bed_1 ~ sqft,
+            filter(apts, in_sf == 0))
+
+plots <- gg_diagnose(model, plot.all = FALSE)
+plot_all(plots[c('res_fitted', 'qqplot')], max.per.page = 1)
+```
+
+## Link Functions
+
+At this point, we can see that "linear modeling" does not necessarily mean the data we're modeling forms a line. Rather, if it's monotonic, then we can transform $x$ and $y$ variables such that our relationship is linear and assumptions are met.
+
+The basis of linear modeling is some **linear component:**
+
+$$
+\hat{z} = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k
+$$
+
+-   $x_i$ is the $i$th explanatory variable and $\hat{z}$ maintains a linear relationship with each $x_i$.
+-   $\hat{z}$ can be between $-\infty$ and $\infty$, and errors are *normally* distributed over the line.
+
+**However,** $z$ **might not be the response variable.** To model the response variable in general, we need a **link function** $f(z) = y$ to convert the linear value $z$ into our response $y$. So, the inverse $f^{-1}(y) = z$ becomes the new linear model which R runs, and we can use $f$ to transform back to $y$.
+
+*E.g., In the case of ordinary linear regression,* $f$ *is just the identity* $f(z) = z$*, but there are other situations where we need to create a different function.*
+
+### Logistic Regression
+
+Suppose our goal is to predict whether or not an apartment is in SF. To do this, we use `in_sf` which is a **binary** response variable, and elevation as our explanatory variable. What we want is a *monotonic* function which outputs something like 1 or54 0 for a given `elevation`.
+
+```{r}
+apts |>
+  ggplot(mapping = aes(x = elevation, y = in_sf)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  labs(title = "Modeling a Binary Response with OLS") +
+  theme_minimal()
+```
+
+A standard regression line assumes that $y$ is distributed by a normal distribution for any given $x$ value, so it could be anything, not just 1 or 0. In fact, these values could theoretically become negative.
+
+It turns out that the **Sigmoid** **Function** has exactly the properties we need for this situation:
+
+$$
+p = \sigma(z) = \frac{1}{1 + e^{-z}} = \frac{1}{1 + e^{-(\hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k)}}
+$$
+
+-   $z$ can be any number
+-   $0 < \sigma(z) < 1$ and it's monotonic
+
+Given this, we can think of the $\sigma(z)$ function as outputting a kind of "probability" or "likelihood" of a 1 or 0 in the response column:
+
+```{r}
+# for now, -5 and 0.15 are coefficient estimations ...
+sigmoid <- \(x) 1 / (1 + exp(-(-5 + 0.15 * x)))
+
+apts |>
+  ggplot(mapping = aes(x = elevation, y = in_sf)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_function(fun = sigmoid, color = 'blue', linewidth = 1) +
+  labs(title = "Modeling a Binary Response with Sigmoid") +
+  scale_y_continuous(breaks = c(0, 1)) +
+  theme_minimal()
+```
+
+Now when we take in a value of elevation, and place it into our linear combination, then we are returned with some "probability" between 0 and 1.
+
+$$
+\frac{1}{1 + e^{-(-5 + 0.15\times\texttt{elevation})}} = \frac{1}{1 + e^{-z}} = \sigma(z) = p
+$$
+
+The *linear* model comes from the inverse of this function, and that is what R is modeling. In this case
+
+$$
+\begin{align*}
+p = \sigma(z) &= \frac{1}{1 + e^{-z}} \\
+p + pe^{-z} &= 1 \\
+pe^{-z} &= 1 - p \\
+e^{-z} &= \frac{1 - p}{p} \to 
+e^{z} = \frac{p}{1 - p} \\
+z &= \log\left(\frac{p}{1 - p}\right) = \text{log odds of $y$}
+\end{align*}
+$$
+
+We call this function the "**logit"** function, and it is the **link** function for *Logistic Regression*. In this case, the final linear model is
+
+$$
+\text{log odds of $y$} = \log\left(\frac{\hat{p}}{1 - \hat{p}}\right) = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k
+$$
+
+*(where* $\log = \ln$*, the natural log.)*
+
+So, the linear combination $z$ represents the **log-odds** that y = 1. And, in fact, each row $\mathbf{x}$ corresponds to a single Bernoulli Trial (i.e., $P(\texttt{in_sf}) = p$). If we model based on all of these trials, we have a Binomial Distribution (i.e., the number of successes among $n$ Bernoulli trials). So, in R, we can model `in_sf` using `elevation` by setting our family of link functions.
+
+```{r}
+model <- glm(in_sf ~ elevation, data = apts,
+             family = binomial(link = 'logit'))
+
+model$coefficients
+```
+
+Now, recall that we are modeling log odds of $y$ with
+
+$$
+\log\left(\frac{\hat{p}}{1 - \hat{p}}\right) = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k
+$$
+
+So, *keeping all else held constant*, if we increase $x_i$ by one unit, the log-odds increases by $\beta_i$.
+
+$$
+\begin{align}
+\log(\text{odds}_{x_i+1}) &= \log(\text{odds}_{0}) + \beta_i \newline
+\text{odds}_{x_i+1} &= e^{\log(\text{odds}_{0}) + \beta_i} \newline
+\text{odds}_{x_i+1} &= \text{odds}_{0} \times e^{\beta_i}
+\end{align}
+$$
+
+, where $\text{odds}_{x_i+1}$ is the odds after we increase $x_i$ by one unit, and $\text{odds}_{0}$ is the odds before we increased $x_i$ by one unit. This means that **for every unit increase in** $x_i$, the odds is *multiplied* $e^{\beta_i}$ times.
+
+In our case,
+
+$$
+\log\left(\frac{p}{1 - p}\right) = -3.275 + 0.131\times\texttt{elevation}
+$$
+
+So, for every foot increase in elevation, the odds that the apartment is in SF is multiplied by by $e^{-0.1308} = 0.877$, or for every foot increase in elevation, the odds of a San Francisco apartment goes down by about 12% ($1 - 0.877 = 0.123$). It suffices to say that `e ^ coef` is more interpretable than `coef`.
+
+The `(Intercept)` represents the log-odds when all the feature values are equal to zero. This can be used to determine a 50%-probability "decision threshold" for any variable. The 50% probability is reached when $\text{odds} = 1 \to \log(\text{odds}) = 0$. So, recalling the intercept and coefficient from above, we have
+
+$$
+\begin{align}
+0 &= \log(\text{odds}) \newline
+\to \quad 0 &= \beta_0 + \beta_1 x_1 \newline
+&= -3.275 + 0.131 \cdot \texttt{elevation} \newline
+3.275 & = 0.131 \cdot \texttt{elevation}  \newline
+\to \quad \texttt{elevation} &= \frac{3.275}{0.131} = 25
+\end{align}
+$$
+
+So, when the elevation is roughly 25 feet above sea level, there is a 50/50 odds that the apartment is in SF.
+
+```{r}
+# these coefficients come from the model
+sigmoid <- \(x) 1 / (1 + exp(-(-3.275 + 0.131 * x)))
+
+apts |>
+  ggplot(mapping = aes(x = elevation, y = in_sf)) +
+  geom_jitter(width = 0, height = 0.1, shape = 'O', size = 3) +
+  geom_function(fun = sigmoid, color = 'blue', linewidth = 1) +
+  labs(title = "Modeling a Binary Response with Sigmoid") +
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  theme_minimal()
+```
+
+Here we can see that this sigmoid function gives us insight into the likelihood that an apartment is in SF, given some elevation.
+
+In review, with Logistic Regression:
+
+-   $y$ is modeled using the "log" (log-odds) link function
+-   We expect $y$ to abide by the **Binomial** distribution
+    -   In this case, $\hat{p} = \sigma(\hat{z})$, where $\hat{z}$ is our linear component
+
+### EXERCISE
+
+Take a look at the `model$fitted.values` for the above logistic model, representing "probabilities" for each row of data. Can you use this vector to create a kind of "residual" plot to determine if the model is consistent in its estimations?
+
+```{r}
+# model$fitted.values
+```
+
+### Poisson Regression
+
+Another common situation where our linear model needs to be adjusted to meet the situation is Poisson Regression, where our response variable $y$ is of count data, and numbers less than 0 don't make sense. In these cases, we can simply use the $z = \log(y)$ transformation on our response. In this way, the outcome is always non-negative.
+
+$$
+\begin{align*}
+\log(\hat{y}) &= \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k \\
+\hat{y} &= e^{\hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \cdots + \hat{\beta}_kx_k}
+\end{align*}
+$$
+
+For example, price (or, positive dollar amounts in general) typically resembles a Poisson distribution.
+
+```{r}
+apts |>
+  ggplot(mapping = aes(x = price)) +
+  geom_histogram(color = 'white') +
+  labs("Histogram of Price of SF and NYC Apartments") +
+  theme_hc()
+```
+
+Recall that we already calculated the `log_price`, so we were already halfway there.
+
+```{r}
+apts |>
+  ggplot(mapping = aes(x = sqft, y = log_price)) +
+  geom_point(shape = 'O', size = 3) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Log(Price) vs. Square Footage") +
+  theme_minimal()
+```
+
+This also looks a bit like a $y = \sqrt{x}$ function, so we might want to apply a square root transformation to the `sqft` variable.
+
+```{r}
+apts <- apts |>
+  mutate(sqrt_sqft = sqrt(sqft))  # add new variable
+
+apts |>
+  ggplot(mapping = aes(x = sqrt_sqft, y = log_price)) +
+  geom_point(shape = 'O', size = 3) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Log(price) vs. sqrt(Square Footage)") +
+  theme_minimal()
+```
+
+When we model the Poisson Regression, we just need to select the `poisson` family on **the *original* response variable** without any log transformation (R will do the transformation as part of the modeling routine).
+
+```{r}
+model <- glm(price ~ sqrt_sqft, data = apts, 
+             family = poisson(link = 'log'))
+
+model$coefficients
+```
+
+Here, we interpret our coefficients similarly to logistic regression:
+
+$$
+\begin{align*}
+\log(\hat{y}_{x_i + 1}) &= \log(\hat{y}_{0}) + \beta_i \\
+\hat{y}_{x_i + 1} &= e^{\log(\hat{y}_{0}) + \beta_i} \newline
+\hat{y}_{x_i + 1} &= \hat{y}_{0} \times e^{\beta_i}
+\end{align*}
+$$
+
+In this way, *if all else is held constant*, we can interpret $e^{\beta_i}$ as the expected *percent* change in $y$ that occurs with each unit increase in $x_i$.
+
+In our case, we have
+
+$$
+\log(\texttt{price}) = 12.214 + 0.055 \times \sqrt{\texttt{sqft}}
+$$
+
+so, for every unit increase in $\sqrt{\texttt{sqft}}$ (which is kind of convenient because "square feet" is already a square), the price is multiplied by $e^{0.055} = 1.057$ which translates to about a 5.7% increase in price.
+
+```{r}
+# these coefficients come from the model
+inv_log <- \(x) exp(12.214 + 0.055 * x)
+
+apts |>
+  ggplot(mapping = aes(x = sqrt_sqft, y = price)) +
+  geom_point() +
+  geom_function(fun = inv_log, color = 'blue', linewidth = 1) +
+  labs(title = "Modeling Price with the Poisson Model") +
+  theme_minimal()
+```
+
+In review, with Poisson Regression:
+
+-   $y$ is modeled using the "log" link function
+-   We expect $y$ to abide by the **Poisson** distribution
+    -   In this case, $\log(\hat{z})$ is the expected count, where $\hat{z}$ is our linear component
+
+### Other Links and Families
+
+Above we've seen use of the `binomial` and `poisson` families of distributions, with different link functions. But, there are all kinds of families and link functions, each for different use cases. In most cases, one of the above cases will be more than sufficient, but there are [other options](https://stats.stackexchange.com/a/303592) to investigate depending on the time available and precision required.
+
+## Special Cases
+
+### Zero-Inflated Data
+
+It is not uncommon for count data (i.e., Poisson distributed data) to contain an overabundance of zero values when the likelihood of such an event is low, and "not having any" is not uncommon. E.g., lottery winnings, purchases of an expensive product, number of disasters in a region, etc. In these cases, the response variable is "zero inflated".
+
+There are [Zero Inflated Models](https://en.wikipedia.org/wiki/Zero-inflated_model) which are designed to deal with this issue in one all-encompassing regression model (e.g., [*zeroinfl*](https://www.rdocumentation.org/packages/pscl/versions/0.60/topics/zeroinfl) or [*ziplss*](https://www.rdocumentation.org/packages/mgcv/versions/1.9-0/topics/ziplss)), but the setup, interpretation of, and inference from these models can get relatively complex and convoluted. So, for the sake of accessibility of the analyst and the stakeholder, it's recommended that we:
+
+1.  Create a column to partition the data based on whether the response is 0.
+2.  Analyze the zero vs. non-zero nature of the response using logistic regression.
+3.  Analyze the strictly positive response values using the appropriate GLM.
+
+### Generalized Additive Models
+
+We can think of the zero-inflated process (steps 1, 2, and 3 described above) as "stacking" linear models. A Generalized Additive Model is one which does exactly this in a single complex model. Since these models are primarily used for predictive modeling and thus difficult to interpret when doing inferential statistics (the focus of this course), we do not cover them in this class.
+
+### Overdispersion
+
+Zero-Inflation a severe case of [overdispersion](https://en.wikipedia.org/wiki/Overdispersion) of the response variable, which can usually be addressed by adjusting the `family` parameters of the GLM. However, since the effect on the model of overdispersion is usually minimal, we do not cover it in this class.

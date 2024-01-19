@@ -1,0 +1,541 @@
+# Data and R
+
+Topics covered in these notes:
+
+-   Data Frames
+-   Summarizing Data
+-   The Tidyverse
+-   Basic Visualization
+
+> ***Note**: I do not give comprehensive definitions for many of the functions use in this notebook (or the ones to follow). If the use of a function seems unclear, I encourage you to use the `?` functionality in R to learn more about what these functions are doing. Alternatively, refer to the [posit Cloud Cheat Sheets](https://posit.cloud/learn/cheat-sheets), or use Google!*
+
+**Basic Setup:**
+
+1.  Set your working directory to a specific folder. Navigate to a preferred folder in the pane on the lower right, click the "More" button, and select "Set as Working Directory". Now, any time we want to reference a file in this directory, we only need to use the shortcut `./`.
+2.  Type "**Cmd + ,**" or navigate to "Edit" -\> "Settings" in RStudio's main top menu. Select the "Code" tab, and check the box for *"use native pipe operator"*. Feel free to adjust any other themes and settings if you like.
+
+## Data Frames and Tibbles
+
+Our purposes for using R stem from the need to process data so we can do statistics. So, it makes sense to start our introduction to R with the **data frame**, the manner in which R stores data (tables).
+
+Technically, every data table in R is stored as a collection of **vectors** (columns), which is then given special ease-of-use attributes when stored as a `data.frame`. When the data frame is then stored as/converted to a [**tibble**](https://tibble.tidyverse.org/)**,** data manipulation and management becomes cleaner, easier, and faster. So, for the remainder of this course, we will ensure all data is stored as a tibble (using `as_tibble`, if needed), and the terms "tibble" and "data frame" will be used interchangeably.
+
+### Loading Data
+
+Before we get started, we will import the libraries needed to run these notes.
+
+```{r}
+library(tidyverse)  # we will see more on this package in a bit
+```
+
+A convenient data set which we can continue to use throughout this walk-through is the `mpg` [data set](https://ggplot2.tidyverse.org/reference/mpg.html). (This should already have been made available with `ggplot` when we ran the above code block.)
+
+```{r}
+# load the data so we can view it in RStudio
+data(mpg)
+```
+
+Once the data is loaded, find it in the **Environment** panel. Click the arrow (on the left) to view the **structure** of the data (a.k.a. `str(mpg)`), and click the small data table icon (on the right) to **View** a rendering of the table (a.k.a. `View(mpg)`, with a capital `V`). `head()` and `tail()` are also helpful functions for getting a glimpse of a data frame or tibble.
+
+### R Objects
+
+R is an "object oriented" language. This means that when we type a string of characters without quotations around it (e.g., `mean`, or `mpg`), we are referencing an R [**object**](https://stat.ethz.ch/R-manual/R-devel/library/base/html/typeof.html) stored in memory. An R object could be a function (like `mean`), or a data frame (like `mpg`), or a "variable" that we define. When I say variable in this context, I simply mean an R object with a name. We use the `<-` symbol to define R variables:
+
+```{r}
+# code preceded by hashtag is a non-executable *comment*
+
+# watch as you type new object names ... makes sure it's not taken
+numbers <- c(1, 2, 3, 4)
+numbers # added by Amritha.
+```
+
+To distinguish between this kind of variable and a column of data, I'll use "object" or "R-variable" to denote the former, and simple "variable" to denote the latter.
+
+> Note: If you think you might have overwritten a built-in R-variable, use `rm(var)` to revert.
+
+### Data Types and Vectors
+
+When you view the structure of the data, you should see next to the name of the column some abbreviation (e.g., "chr" or "int"). These are **data types**, or the kind of value that R is storing for that column vector. There are seven basic data types in R: Double, Integer, Character, Logical, Date, Complex, Raw, and NULL.
+
+```{r}
+# I use "_" to keep from overwriting existing R objects
+double_ <- pi                     # <- assigns new values to objects
+integer_ <- 3L                    # notice the L
+character_ <- "pi"
+logical_ <- TRUE
+null_ <- NULL                     # this is essentially a non-existent value
+date_ <- as.Date("03-14-1593", 
+                 "%d-%m-%Y")
+
+# these will not be used in this course
+complex_ <- 3i + 14               # notice the "i"
+raw_ <- charToRaw("pi")           # this stores raw bytes (we won't use it)
+
+typeof(double_)
+pi
+integer_
+```
+
+Importantly, a **vector** (singularly defined using `c(val1, val2, …)`) can only contain data of one datatype (or NULL values). Since any column of a data frame is a vector, this holds true for columns of data as well.
+
+Alternatively, a **list** (defined using `list(val1, val2, ..)`) can contain multiple datatypes. Technically, you can create [list-columns](https://dcl-prog.stanford.edu/list-columns.html), but these (and lists in general) are mostly useful for more advanced data cleaning and manipulation, and we won't be using either of them in this course.
+
+> If we want to be pedantic, the "vectors" and "lists" above are both a type of *R* *vector*. The former is non-recursive, and the latter is recursive. Since **we are only using non-recursive vectors in this course**, we will refer to them simply as "vectors".
+
+### EXERCISE
+
+Instantiate a few different variables; one of each data type which will be used in this course. Try running different mathematical operations on each variable (or, combinations of variables).
+
+```{r}
+# your code here ...
+my_name <- "amritha"
+my_name
+```
+
+### Working with CSV Files
+
+Supposing we would like to save this data frame (or one like it) as a CSV file, we can do so with the tibble-optimized `write_delim`, that is:
+
+```{r}
+write_delim(mpg, "./mpg_data.csv", delim = ",")
+```
+
+Similarly, you can load CSV data with
+
+```{r}
+mpg2 <- read_delim("./mpg_data.csv", delim = ",")
+```
+
+*("delim" is short for "delimiter", the character defining columns in the file.)*
+
+### Summarizing Data
+
+Much of what we are expected to do as data practitioners is navigate the chaos of our data. With such large amounts of data with unbounded dimensions (columns), we need to summarize our data into numbers that we can understand. We'll use the term **statistic** to denote a number that describes some data. A few helpful "summary statistics" we use often are `mean`, `median`, `mode`, `max`, `min`, or `count`. Another helpful summary statistic is the `quantile`. E.g., the 1st and 3rd *quartiles* (notice the "r") mark partitions for 25% and 75% of the data. So, between the 1st and 3rd quartile, we have 50% of the data. We can get a glimpse of our data and all of these summary statistics using `summary`:
+
+```{r}
+summary(mpg)
+```
+
+We will see later how to summarize character columns.
+
+Another important statistic that is not included above is the variance (or, the standard deviation). The variance (`var`) is the average *squared* distance of each number from the mean, and it represents a crucial measure of "statistical dispersion". The standard deviation (`sd`) is the square root of this.
+
+> **Note**: Standard Deviation is just *one* measure of dispersion. Quantiles (`quantile`) can also provide a good look at how spread out the data is, and the [Gini Coefficient](http://kimberlyfessel.com/mathematics/applications/gini-use-cases/) (not discussed in this class) provides another.
+
+###IQR - also a meaure of dispersion  # added by Amritha
+
+### EXERCISE
+
+Using the `mpg` data, calculate some of the summary statistics (individually) for each of the numeric columns. Consider the `weighted.mean()`. Is there a column or situation where this might make sense? Investigate different quantiles of data (i.e., use the `quantile` function with multiple quantiles partitions).
+
+```{r}
+# your code here
+#mpg$displ
+quantile(mpg$displ, probs =c(25, 50, 75)/100)
+
+```
+
+
+## Working in the Tidyverse
+
+The [tidyverse](https://www.tidyverse.org/) is a curated collection of R packages, specifically selected with data science (and statistics) in mind. The packages are designed to work especially well with one another, and seamlessly with base R.
+
+### Vocabulary
+
+| Term            | Definition                                                            |
+|-----------------|-----------------------------------------------------------------------|
+| **variable**    | a quantity, quality, or property that you can measure                 |
+| **value**       | the state of a variable when it was measured                          |
+| **observation** | a set of measurements under the same conditions *for a single entity* |
+
+**Tabular data** is a table of values, each associated with a variable and an observation. Tabular data is **tidy** if each value is placed in its own cell, each variable in its own column, and each observation in its own row. In this course, we aim to find data sets that are as tidy as possible.
+
+### Useful Functions
+
+Functions are R objects that take an input within parentheses, and execute some operation. The values within the parentheses for a function are called **arguments**. Typically, functions in the tidyverse have a data frame or column (vector) as their first argument, then subsequent arguments are either named in the function or named by the user. We'll see more on functions later in the course.
+
+#### Examples
+
+```{r}
+# sorting (arranging) data based on the value in a column
+arrange(mpg, displ)
+# Added by Amritha
+mpg |>
+arrange(displ)
+```
+
+In the documentation for `arrange` (and many functions like it), `…` denotes variable names. Notice that we call `displ`, a column name in `mpg`, as an R object itself. When we pass a data frame in a function, often the columns *are* vectors themselves, so we can refer to them in that way.
+
+```{r}
+filter(mpg, model == "a4")
+```
+
+In the case of `filter`, we pass the data frame and a logical vector which is determined by running a logical operator (e.g., `==` referencing a particular value "a4") on a vector (e.g., the `model` column). In other words, arguments can also be equations themselves.
+
+```{r}
+# add a deviation column (scroll to the right)
+mutate(mpg, cty_deviation = cty - mean(cty))
+# below comment added by Amritha
+# Here above, vector addition with a scalar[mean(cty)] is happening above but we can add with a vector
+```
+
+Here, we are *naming* (creating) a new column (`cty_deviation`) within the function definition. Deviation columns like this calculate how far a variable (e.g., City Mileage) for each row deviates from the mean across all rows.
+
+```{r}
+# explicit function for the $ operation
+pluck(mpg, "cty")
+```
+
+Lastly, sometimes a function needs the *name* of a particular column (or value itself) in the data frame. In these cases, you'll use a string (rather than an object) in the argument. (In this particular case, with `pluck`, you could also use an integer `k` to reference the `k`-th column.)
+
+#### EXERCISE
+
+Explore these functions. What is the highest or lowest city mileage? Highway mileage? What about this same question for a particular class of vehicle? Consider extracting just a single column from a subset of the data. Come up with questions of your own, and try to answer them using the above functions.
+
+```{r}
+# your code here
+max(mpg$cty)
+min(mpg$cty)
+
+max(mpg$class)
+min(mpg$class)
+```
+
+### Piping
+
+Arguably, the most foundational element of tidyverse coding in R is using the pipe operator. Since R version 4.2, the native pipe operator is `|>` (a bar followed by the greater than symbol). This is an improvement on the [earlier](https://stackoverflow.com/a/72086492) pipe operator (`%>%`), but as we will see below, there is one particular use case in which the older version is actually preferred.
+
+The idea is to start with a data frame, and sort of pipe your way through a routine. You can read each line as "do this" and each `|>` as "and then ...".
+
+```{r}
+mpg |>                     # get data frame
+  filter(year >= 2000) |>  # then, filter it by the year column
+  pluck("cty") |>          # then, select the "cty" column
+  mean()                   # then, calculate its mean
+```
+
+The output of each line is passed on to the *first* argument of the following line (so, you only need to type any second argument and on). Recall, the first argument of almost all tidyverse functions is a data frame or vector!
+
+#### Pipe Example: Grouping
+
+Here, we are grouping the data by the `class` variable, and for each value in that column, we are calculating (and naming) two new aggregate columns for the `cty` and `hwy` variables (i.e., their mean). The result is a new "grouped" data frame.
+
+```{r}
+mpg |>
+  group_by(class) |>
+  summarise(mean_cty = mean(cty),
+            mean_hwy = mean(hwy)) |>
+  sort()
+```
+
+> **If you are doing a grouping operation, use `group_by`.** Below, we have an example of another method, `aggregate`, but *only* for demonstration purposes.
+
+#### EXERCISE
+
+Try a few various group-by operations on the `mpg` dataset. Can you think of questions you might ask regarding the available discrete variables? How can you summarize those discrete variables using `group_by`-`summarise`. Try a few different versions --- to to ask a question which might require you to use `mutate`.
+
+```{r}
+# your code here
+mpg |>
+  group_by(cty) |>
+  filter(class == "compact")
+
+
+```
+
+#### Pipe Example: Placeholders
+
+If the object being passed to the next pipe is meant for an argument other than the first one, use the alternate pipe operator `%>%` in combination with a period `.` to signify which argument should use the incoming pipe object.
+
+```{r}
+mpg %>%  #                  ->  v  <- notice the "."
+  aggregate(cty ~ class, data = ., FUN = mean)
+```
+
+The above routine creates a [**formula**](https://cran.r-project.org/web/packages/lazyeval/vignettes/lazyeval.html#formulas) using the tilde `~` operator. The idea is to define what lies on the left side *in terms of* what lies on the right side. In this case, the term is the `mean` function for each `class` group. The `aggregate` function here is mirroring the `mean_cty` portion of the (preferred) `group_by` operation, above.
+
+> Note: The native pipe operator `|>` also has placeholder capability (i.e., using `_`), but it is limited, so we avoid using it.
+
+### Basic Plotting
+
+We use [**ggplot2**](https://ggplot2.tidyverse.org/) for plotting in R. Below is the basic code blocking for ggplot visualizations:
+
+```{r eval=FALSE, include=FALSE}
+ggplot(data=<data>) +                     # data binding
+    geom_<type>(mapping=aes(...), ...) +  # layer of visual elements
+    geom_<type>(mapping=aes(...), ...) +  # subsequent layers ... (optional)
+    <formatting>                          # custom formatting
+```
+
+**Data Bindings**: This line of code doesn't really plot anything. We should think of this line of code as the framework for the *connection* between data and visual elements. In other words, this creates the basis for the coordinate system.
+
+**Layers**: R creates *layers* of visual elements to the coordinate plane. After having determined the data bindings, we map each datum to a visual element (e.g., a row of data to a filled in circle). The `mapping` argument is always paired with the `aes` (aesthetic) function to link column names or other vectors with the same length as the data (e.g., logical outcomes).
+
+-   An **aesthetic** is a property for a visual element bound to a data point. This could be the location of the visual element (e.g., its x-y coordinates), or it could be `color`, `size`, `shape`, etc. Aesthetics are *mapped* to visual elements.
+
+-   *Outside* of the `mapping` argument, you can globally define a single value to each visual element (e.g., using `color` as its own argument, outside of `aes`.)
+
+-   The `data` argument in `ggplot()` binds the same data set across the whole visualization (unless otherwise specified). In the same way this argument could be moved down to specific layers, we could also place `mapping` arguments into this `ggplot()` to apply globally across the visualization.
+
+**Formatting**: This block contains any formatting we want to apply to the plot. For example, scale, axis labels, etc.
+
+All of these together form the "**g**rammar of **g**raphics" ([**gg**plot](https://ggplot2.tidyverse.org/reference/)).
+
+#### Asking Questions
+
+1.  **Start with a question**. Before any sort of analysis, we need to start with a well-formed question.
+2.  Then, we need to **scope our data** to specifically capture the necessary information to answer that question.
+3.  Finally, we **try many different visualizations**, making sure to pick the one that seems to present the data most efficiently, *without distorting any meaning*.
+
+> (Optional: For each of the plots below, create your own executable R cell, and try to make your own version of the same plot with different data.)
+
+#### Bar Plots
+
+In a visualization, a solid bar does a great job at communicating "amount" for categorical variables (e.g., `sum`). And, after a quick glance at the structure of this data, a question that comes to mind is how the manufacturers differ insofar as the *amount* of the various classes they make changes from one to the next.
+
+```{r}
+n_distinct(mpg$manufacturer)
+```
+
+Before I plot anything, I'm seeing that there are actually more manufacturers than I should be putting on a plot (avoid plotting any more than 7 categorical values). Why don't we choose the manufacturers with a decent variety of class (i.e., 3 or more).
+
+```{r}
+manufacturers <- mpg |>
+  group_by(manufacturer) |>
+  summarize(num_classes = n_distinct(class)) |>
+  arrange(desc(num_classes)) |>
+  filter(num_classes >= 3) |>  # verify the data before continuing
+  select(manufacturer) |>
+  as_vector()                  # we need this as a vector
+```
+
+```{r}
+p <- mpg |>
+  filter(manufacturer %in% manufacturers) |>  
+  ggplot() +  # recall, layers/formatting are added (+) to the plot
+  geom_bar(mapping = aes(x = manufacturer, fill = class)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = 'Dark2')
+
+p
+```
+
+Let's walk through what's happening in this code ...
+
+1.  The `%in%` operator returns a boolean (TRUE/FALSE) vector based on whether a value in the first vector is in the second vector.
+2.  Remember that the first argument of these functions is typically the dataset, so we don't need to define `data = mpg...`, since it's already instantiated in the pipe.
+3.  A [**geom**](https://ggplot2.tidyverse.org/reference/#geoms) is a "geometric object" in ggplot, and we should think about it as a *single* visual element bound to each data point. In this case, the geom is a `_bar`, so each data point (count of data with a manufacturer-class combination) is bound do a single *bar*. Each bar's aesthetics are mapped to an attribute of its data point.
+    -   By default, the `geom_bar` maps `count` of data to the y-axis
+    -   Each bar is actually an outline for an empty rectangle. `color` would color that outline, and `fill` is the color of the inside.
+4.  I believe formatting each plot is a good habit to get into, even minimally. In this case, `theme_minimal()` is a particular [theme](https://ggplot2.tidyverse.org/reference/ggtheme.html) I like when the grid lines matter.
+5.  There are scales for color, date, axes, etc. In this case, we're using a particularly eye-friendly discrete scale that I prefer for situations like this.
+6.  Lastly, we store this plot as an object, `p`, to refer to later. You don't need to do this every time, and you definitely don't need a different object for each plot, but it's good to keep in mind.
+
+Which manufacturers are we excluding? For the sake of comprehensiveness, it would be a good idea to report on these as well.
+
+```{r}
+mpg |>
+  filter(!(manufacturer %in% manufacturers)) |>
+  select(manufacturer) |>
+  distinct()
+```
+
+You might include this list in your report for this particular analysis.
+
+#### Histograms
+
+Recall the `summary` from earlier gives us a very oversimplified view of how our non-discrete data are distributed. Histograms give us a full visualization of the distribution from minimum to maximum.
+
+(Again, we need a question.) Suppose we are particularly interested in the ratio between the typical car's highway mileage to their city mileage.
+
+```{r}
+mean_ratio <- mean(mpg$hwy / mpg$cty)
+
+mpg |>
+  mutate(hwy_to_cty = hwy / cty) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = hwy_to_cty), color = 'white') +
+  geom_vline(xintercept = mean_ratio, color = 'orange') +
+  annotate("text",  # the type of annotation
+           x = 1.425, y = 24.5, label = "Average", color = 'orange') +
+  theme_classic()
+```
+
+It looks like typically, a car's highway mileage is about 40% more than its city mileage. Notice our use of the [`annotate`](https://ggplot2.tidyverse.org/reference/annotate.html) function.
+
+We might also be interested in how this changes between automatic and manual transmissions.
+
+```{r}
+mpg |>
+  mutate(is_automatic = grepl("auto", trans),
+         hwy_to_cty = hwy / cty) |>
+  ggplot() +
+  geom_density(mapping = aes(x = hwy_to_cty, color = is_automatic)) +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2")
+```
+
+We'll dive deeper into density plots later in the course, but for now we can think of it as a "smoothed" histogram, helping to give us a sense for the *relative* (proportions, not counts) distribution of our data. In this plot, we can see that the highway-to-city ratio remains pretty consistent between automatic and manual transmissions.
+
+#### Box Plots
+
+Suppose we're interested in the difference in city mileage between the different manufacturers. Box plots (or "box and whisker plots") are a great way to visualize multiple distributions at once.
+
+```{r}
+mpg |>
+  filter(manufacturer %in% manufacturers) |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = manufacturer, y = cty)) +
+  ggtitle("City Mileage by Manufacturer") +
+  theme_minimal()
+```
+
+For each manufacturer, we have a box with "whiskers" extending from above and below:
+
+-   The bottom of the box represents the 25th percentile, and the top represents the 75th percentile. So, the 50% of the data lies "within" the box. This is the Interquartile Range, or IQR.
+-   The whiskers extend from the box to the maximum or minimum value, but no further than $1.5 \times \text{IQR}$ from the top or bottom of the box, respectively.
+-   Any points past the whiskers are typically defined as outliers.
+-   The horizontal line within the box represents the median value for the data. The lower half of the data lies below this value, and upper 50% above it.
+
+> `geom_violin` is *sometimes* a prettier alternative to the box plot, but usually it tends to overcomplicate the visualization.
+
+#### Scatterplots
+
+Now, we might be interested in the relationship between Highway fuel mileage and the displacement (cylinder volume, in liters) of a car's engine. We'd expect that larger engines have lower fuel mileage.
+
+```{r}
+mpg |>
+  ggplot() +
+  geom_point(mapping = aes(x = displ, y = hwy)) +
+  theme_classic()
+```
+
+We may want to figure out what is going on with the points that stand out (six points on the far right, and two on the far left).
+
+For this, we are going to import the library [`ggrepel`](https://www.rdocumentation.org/packages/ggrepel/versions/0.9.3)`.`
+
+```{r}
+library(ggrepel)
+```
+
+```{r}
+# add a new column for these abnormally high highway mileages
+mpg <- mutate(mpg, high_hwy = (hwy > 40 & displ < 2) |
+                              (hwy > 20 & displ > 5))
+mpg
+# start a new ggplot for multiple data set bindings
+ggplot(mapping = aes(x = displ, y = hwy)) +
+  geom_point(data = filter(mpg, !high_hwy), color = 'darkblue') +
+  geom_point(data = filter(mpg, high_hwy), color = 'darkred') +
+  geom_text_repel(data = filter(mpg, high_hwy),
+                   mapping = aes(label = model)) +
+  theme_classic() +
+  scale_color_brewer(palette = "Set1")
+```
+
+For large data sets, the box plot gives us an interesting view of relationships between two continuous variables. That is, we can use the `cut_width` [**cut function**](https://ggplot2.tidyverse.org/reference/cut_interval.html) to [`group`](https://ggplot2.tidyverse.org/reference/aes_group_order.html) a continuous variable into sections, and plot a box plot for each partition.
+
+```{r}
+
+mpg |>
+  ggplot() +
+  geom_boxplot(mapping = aes(x = displ, y = hwy, 
+                             group = cut_width(displ, width = 0.5))) +
+  labs(title = "Mileage by Displacement") +
+  theme_minimal()
+```
+
+> `cut_width` here converts our continuous variable into something discrete (i.e., partitions of width 0.5), and `group` plots the discrete groups *over* the continuous axis.
+
+This technique is particularly useful for very large data sets where scatterplots are harder to read. Also, notice our use of the ggplot [**`labs`**](https://ggplot2.tidyverse.org/reference/labs.html) function for adding different labels to our plot.
+
+#### Line Plots
+
+Line plots are particularly (and in a way, *specifically*) useful for situations where there is a meaningful "movement" along an x-axis continuum. E.g., time, distance, or points along some process. And, since our `mpg` data set only contains two years of data, we'll use a different data set to illustrate this example.
+
+With line plots, I prefer a particular theme that comes with the `ggtheme` package. We'll need to import that.
+
+```{r}
+library(ggthemes)
+```
+
+```{r}
+economics |>
+  ggplot() +
+  geom_line(mapping = aes(x = date, y = unemploy)) +
+  expand_limits(y = 0) +  # sometimes you need to force zero lines 
+  theme_hc() +  # this theme is great for line plots 
+  labs(title = "Unemployment in the US Over Time",
+       x = "Year", y = "Unemployment (in thousands)")
+```
+
+#### Smooth Curve Fits
+
+Let's continue with this `economics` data, and let's investigate how the number of unemployed in the US changes with the country's median duration of unemployment. But, now let's overlay a smooth curve over its scatterplot.
+
+```{r}
+economics |>
+  ggplot(mapping = aes(x = uempmed, y = unemploy)) +  # reduce duplicate code
+  geom_point(color = "gray") +
+  geom_smooth(se = FALSE) +
+  theme_classic() +
+  labs(title = "Unemployment as Duration Increases",
+       x = "Median Duration of Unemployment",
+       y = "Number of Unemployed (in thousands)")
+```
+
+Curves like this give us a clean visual understanding for complex relationships. Feel free to take a look at the `?geom_smooth` documentation to learn about what it's doing, but please keep in mind that the methods described will not be covered in this course.
+
+#### Jittering
+
+Returning to the `mpg` data, suppose we are interested in the relationship between highway mileage and the number of cylinders in the vehicle, while also taking into consideration the year of the vehicle. We can convert the integer cylinder and year variables to factors using `as_factor`, and plot a special sort of scatterplot which avoids over-plotting (i.e., overlapping visual elements).
+
+```{r}
+mpg |>
+  mutate(year = as_factor(year),
+         cyl = as_factor(cyl)) |>
+  ggplot() +
+  geom_jitter(mapping = aes(x = cyl, y = hwy, color = year),
+              width = 0.2, height = 0) +
+  labs(title = "Highway Mileage for Different Cylinder Counts",
+       x = "Cylinder Count",
+       y = "Highway Mileage") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal()
+```
+
+If you ever decide to use a jitter plot like this, **any jittering must be done along a non-continuous axis**. In this case, we jitter along the x-axis (`width`), so we set the vertical jitter (`height`) to zero. Otherwise, the plot becomes deceptive.
+
+#### Faceting
+
+Lastly, we might be interested in visualizing the same plot for multiple subsets of the data, or for multiple [facets](https://ggplot2.tidyverse.org/reference/facet_wrap.html) of a categorical dimension. Suppose we want to see how the relationship between *City* mileage and Displacement changes between the different classes of vehicle.
+
+```{r}
+mpg |>
+  ggplot(mapping = aes(displ, cty)) +
+  # background
+  geom_point(data = mutate(mpg, class = NULL), colour = "grey85") +
+  # foreground
+  geom_point(color = "darkblue") +
+  facet_wrap(vars(class)) +
+  theme_classic() +
+  labs(title = "City Mileage vs. Displacement Over Class",
+       x = "Cylinder Displacement (in liters)",
+       y = "City Mileage")
+```
+
+> To get an overlayed plot like this (adopted from a [ggplot example](https://ggplot2.tidyverse.org/reference/facet_wrap.html#ref-examples)) we can just remove the facet column from the "background" plot using `mutate`, seen before.
+
+To view this a bit better, you can toy with the number of columns `ncol`, or click the little icon to view it in a separate window.
+
+### EXERCISE
+
+Come up with 3-5 different questions about Miles Per Gallon which might be addressed with the `mpg` data. For each question, scope your data set, and build a plot using the `|>` piping code framework.
+
+```{r}
+# your code here
+```
+
+```{r}
+# your code here
+```

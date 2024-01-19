@@ -1,0 +1,155 @@
+---
+title: "Data Dive - Documentation"
+author: "Amritha Prakash"
+date: "2023-09-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 5
+
+### Task(s)
+
+(The purpose of this week's data dive is for you to think critically about the importance of documenting your model, but also the importance of referencing the documentation for the data you're using.)
+
+-   Part 1: A list of at least 3 columns (or values) in your data which are unclear until you read the documentation.
+
+    -   E.g., this could be a column name, or just some value inside a cell of your data
+    -   Why do you think they chose to encode the data the way they did? What could have happened if you didn't read the documentation?
+
+-   Part 2: At least one element or your data that is unclear even after reading the documentation
+
+    -   You may need to do some digging, but is there anything about the data that your documentation does not explain?
+
+-   Part 3: Build a visualization which uses a column of data that is affected by the issue you brought up in bullet #2, above. In this visualization, find a way to highlight the issue, and explain what is unclear and why it might be unclear.
+
+    -   You can use color or an annotation, but also make sure to explain your thoughts using Markdown
+    -   Do you notice any significant risks? If so, what could you do to reduce negative consequences?
+
+------------------------------------------------------------------------
+
+### **Read the Data**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+------------------------------------------------------------------------
+
+**1. Part 1 -** A list of at least 3 columns (or values) in your data which are unclear until you read the documentation.
+
+-   One of the columns that I feel is unclear without any documentation is the column name - **Ship Mode**. It does not justify the values appropriately.\
+    Within a Superstore data set, I presume that the Shipping Mode should define the mode via which the products were being sold and received by the customers. So considering the same, within the Data set, we can see the Ship.Mode Column has categorical value defining 4 different types.\
+    They are as follows -
+
+    1.  Same Day
+    2.  First Class
+    3.  Second Class
+    4.  Standard Class\
+
+    As seen above there are 4 shipping modes. From the name of each, we cannot directly understand their meaning. Only for "Same Day" we can maybe interpret that the products will be received by the customer on the same day. But am not sure on what the other 3 types within the shipping mode signify.\
+    First Class, Second Class and Standard Class inform that they are some shipping mode designed to differentiate on, when they might be obtained by the buyer. But exact details on the range of days, is unknown from the words. Hence I would call SHIP MODE as an unclear column.\
+
+    ```{r}
+    unique(Superstore_data$Ship.Mode)
+    ```
+
+\
+
+-   For certain records, can observe that the value in Profit column is negative, and a lot more negative than how much ever they are sold. Partly, the reason could be that a lot of discount was given compared to the actual cost of the product. Not clear as to why the superstore would do so.\
+    For instance there is a Product which falls under Technology Category, Machine Sub-category which sees the lowest profit. It is about 6599.978\$ Loss. While the quantity for the product is 5 and sales is 4499.985\$. So the company incurred a major loss. This is somewhat a weird case.
+
+    ```{r}
+    m<-min(Superstore_data$Profit)
+    Superstore_data[Superstore_data$Profit == m,]
+    ```
+
+\
+
+-   When we look into **State** Column and count the number of records, we cant really differentiate if actually there are less customers in those states who purchased the products. \
+    Also, another variation for the same would be, if the data collection for the records are not done properly. \
+    Maybe the data is for certain time span alone. But this is unknown to come to a conclusion as to why certain states are having less records \
+    From the below count calculation for each state, can see that State - Wyoming has only 1 record in the entire dataset. Followed by West Virginia with 4 records. Hence, I believe without documentation of the same, we wouldnt know the reason for them being the least in terms of records. \
+
+    ```{r echo=FALSE}
+    #unique(Superstore_data$Ship.Mode)
+
+    count_state <- Superstore_data |> group_by(State) |>
+                  summarise(total_count_state=n(),
+                  .groups = 'drop') |>   arrange(desc(total_count_state))
+    tail(count_state, 10)
+
+    ```
+
+\
+
+**2. Part 2 -** At least one element or your data that is unclear even after reading the documentation
+
+-   Even after reading the documentation, I feel Ship Mode is an unclear column. The documentation suggests the following. 
+    It has 4 values, they are First Class, Same Day, Second Class and Standard Class. Each value is defines the limit for being delayed as follows: 
+
+    Same day: >=0 days  \
+    First class: >=2 days  
+    Second class: \>=3 days \
+    Standard class: \>= 5 days
+    
+    But the detail of when the product was purchased or even when the product reached the customer is unknown. Like the order_date or delivered_date is unknown.\
+    So maybe a bit more clarity on the Ship Mode column is possible, if those two information is known.
+
+-   Apart from that I believe rest all columns are self explanatory or even understood from the documentation. i.e. Segment, Country, City, State, Postal.Code, Region, Category, Sub.Category, Sales, Quantity, Discount, Profit
+
+**3. Part 3 -** Build a visualization which uses a column of data that is affected by the issue you brought up in bullet #2, above. In this visualization, find a way to highlight the issue, and explain what is unclear and why it might be unclear.
+
+-   From the plot, can observe that most purchases are done via Ship.Mode = Standard Class, followed by Second Class, First Class and Same Day. About 6000 records out of 9994 i.e. more than 50% purchase are via Standard Class ship mode.
+
+```{r}
+  Superstore_data |>
+  ggplot(mapping = aes(x=Ship.Mode, color = Ship.Mode, fill=Ship.Mode)) +
+  geom_bar()
+
+```
+
+-   Not sure as to why people would choose a **standard delivery** over the **same day or even first class or even Second class**
+-   There is an un-clarity of why the products are reaching the customers after 5 days in most cases. Is it the mode that customers are given an opportunity to select.? Or Are vendors the reason for the same?
+-   It would have been better, if there was a column that indicated the distance between vendor city and customer city. This could have helped understand the reason of Ship Mode being divided into 4 different types.
+-   Also, the count that we saw in the above plot, suggests the number of orders delivered with Standard Class Ship Mode were more.
+-   Following is a graph between ship mode and quantity indicating the quantity within each order.  \
+    \
+    ```{r}
+  ggplot(Superstore_data) +
+  aes(x = Ship.Mode, y = Quantity, color=Ship.Mode, fill=Ship.Mode) +
+  geom_bar(stat = "identity")
+    ```
+
+-   Overall can see the quantity of products in standard class is more than others i.e. more than 20000 products were purchased with Standard ship mode
+
+-   Also, lets check if the products had an effect in their sales due to the ship mode. \
+\
+    ```{r}
+  ggplot(Superstore_data) +
+  aes(x = Ship.Mode, y = Sales, color=Ship.Mode, fill=Ship.Mode) +
+  geom_bar(stat = "identity")
+    ```
+
+-   I believe since most products were bought from Standard class, the sales for same didn't find much of a difference. Like the sales for it were high.
+-   Also, lets check if the products had an effect in their Profit due to the ship mode. \
+\
+    ```{r}
+  ggplot(Superstore_data) +
+  aes(x = Ship.Mode, y = Profit, color=Ship.Mode, fill=Ship.Mode) +
+  geom_bar(stat = "identity")
+    ```
+
+-   Since there were most products bought from Standard class, naturally they saw loss/profit more in number. But the loss were not as much as the profit, but when compared with other type of classes Standard class did see some loss
+    

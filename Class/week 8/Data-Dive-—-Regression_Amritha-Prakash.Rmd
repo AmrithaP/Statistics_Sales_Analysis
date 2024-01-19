@@ -1,0 +1,275 @@
+---
+title: "Data Dive - Regression"
+author: "Amritha Prakash"
+date: "2023-10-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 8
+
+### Task(s)
+
+
+-   Part 1: Select a continuous (or ordered integer) column of data that seems most "valuable" given the context of your data, and call this your response variable.
+    -    For example, in the Ames housing data, the price of the house is likely of the most value to both buyers and sellers. This is the thing most people will ask about when it comes to houses.
+
+-   Part 2: Select a categorical column of data (explanatory variable) that you expect might influence the response variable.
+    -   Devise a null hypothesis for an ANOVA test given this situation. Test this hypothesis using ANOVA, and summarize your results. Be clear about how the R output relates to your conclusions.
+    -   If there are more than 10 categories, consider consolidating them before running the test using the methods we've learned in class.
+    -   Explain what this might mean for people who may be interested in your data. E.g., "there is not enough evidence to conclude [----], so it would be safe to assume that we can [------]".
+-   Part 3: Find at least one other continuous (or ordered integer) column of data that might influence the response variable. Make sure the relationship between this variable and the response is roughly linear.
+    -   Build a linear regression model of the response using just this column, and evaluate its fit.
+    -   Run appropriate hypothesis tests and summarize their results. Use diagnostic plots to identify any issues with your model.
+    -   Interpret the coefficients of your model, and explain how they relate to the context of your data. For example, can you make any recommendations about an optimal way of doing something?
+-   Part 4: Include at least one other variable into your regression model (e.g., you might use the one from the ANOVA), and evaluate how it helps (or doesn't).
+    -   Maybe include an interaction term, but explain why you included it.
+    -   You can add up to 4 variables if you like.
+
+
+------------------------------------------------------------------------
+
+### **Read the Data**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(dplyr)
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(AmesHousing)
+library(boot)
+library(broom)
+library(lindia)
+```
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+------------------------------------------------------------------------
+
+**1. Part 1 -** Select a continuous (or ordered integer) column of data that seems most "valuable" given the context of your data, and call this your response variable.
+
+-   The data set contains details about various products that a SuperStore has sold to its various customers. From the point of view of an owner, data about various kind of products sold is a good thing to track . But most of all, understanding the sales achieved from them is a must to be known.
+-   Hence, Continuous variable /column that seems most valuable in the context of given dataset,can be considered as Sales i.e. **Response variable = Sales**
+-   Sales is most important for both buyers and seller when they purchase or sell an item. Buyers look for cheapest and best product, while sellers look for attaining best price for selling the product.
+
+
+**2. Part 2 -** Select a categorical column of data (explanatory variable) that you expect might influence the response variable.
+
+-   Let us consider categorical column to be Region. It could help figure out how much of sales of particular product would happen in certain regions based on circumstances/situations related to region. Therefore, **Explanatory Variable = Region**
+
+    
+-   Devise a null hypothesis for an ANOVA test given this situation. Test this hypothesis using ANOVA, and summarize your results. Be clear about how the R output relates to your conclusions.
+
+
+**Null Hypothesis** - There is no significant difference in the mean Sales across different Regions in the Global Superstore dataset.
+H0 suggests that the sales values in different regions are not significantly different from each other, and any observed differences are due to random variability or chance.
+$$
+H_0: \text{AvgSales_south = AvgSales_central = AvgSales_west = AvgSales_east}  
+$$
+\ 
+
+**Alternative hypothesis (Ha)** would then be the opposite of the null hypothesis, suggesting that there is a significant difference in the mean Sales across different Regions.
+
+**ANOVA TEST :- **
+```{r}
+m <- aov(Sales ~ Region, data = Superstore_data)
+summary(m)
+```
+-   In the above case, with a p-value of 0.493, it means that there is no strong evidence to reject the null hypothesis i.e., the data does not provide sufficient evidence to conclude that there are significant differences in mean Sales across different regions. A p-value of 0.493 is relatively high, indicating that the observed differences in Sales may be due to random variation or noise.
+-   We Accept the Null Hypothesis.
+
+```{r}
+pairwise.t.test(Superstore_data$Sales, Superstore_data$Region, p.adjust.method = "bonferroni")
+```
+-   From the above pair plot, It looks like Regions have somewhat same average sale with respect to other regions
+
+-   This means that irrespective of the region the average sales come somewhat similar. There is not enough evidence to conclude the same but since the category of products are Office supplies, technology and furniture it doesn't affect the regions as it is essential and blooming as products. So it would be safe to assume that sales is not affected by region based on the categories.
+
+
+**3. Part 3 -** Find at least one other continuous (or ordered integer) column of data that might influence the response variable. Make sure the relationship between this variable and the response is roughly linear.
+-   Consider the other continuous variable to be **Profit** which might influence how the sales happen.
+-   So the 2 continuous variables are **Sales** and **Profit**. There is a possibility that each of them influence the other. Hoping it to be linear.
+
+-   Build a linear regression model of the response using just this column, and evaluate its fit.
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x = Profit, y = Sales)) +
+  geom_point(size = 2, color = 'darkblue') +
+  theme_minimal()
+```
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x = Profit, y = Sales)) +
+    geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = 'darkblue') + theme_minimal()
+
+```
+-   Looking at the above plots can say there the dataset looks to showcase positive relationship but in reality it is not good for finding relationship between the Sales and Profit continuous variables. It doesnt seem to appropriate plotting of line. 
+-   We can see that the points are scattered all over and line doesnt even pass through it. Hence can say that the relationship of getting linear regressive line between Sales and Profit aint correct.
+
+```{r}
+model <- lm(Sales ~ Profit, Superstore_data)
+model$coefficients
+```
+-   But if needed for the above model of linear regression line that can be drawn, it would have the equation as :  Sales (y) = m * Profit( x= 1.27)  + 193.333
+With the above equation can determine certain relation between sales and profit. 
+If $x_1 (Profit)= 0$, then the expected value for $y_1$ (Sales )is $\hat{\beta}_0 = 193.33$.
+
+-   But I dont think its an ideal way to say that there is positive relationship for all points. As certain instances are observed where the Sales are high but can see a Loss.
+
+- Hypothesis Test for linear regresiion:
+    Consider that the coefficient for a model can be very close to zero, i.e., the relationship between $X$ and $Y$ would be essentially zero. This can be a hypothesis test, and we can determine if there is enough evidence against the claim that there is no relationship between a variable and the response.
+```{r}
+model <- lm(Sales ~ Profit, Superstore_data)
+
+tidy(model, conf.int = TRUE)
+```
+The summary(model) output includes information about hypothesis tests for each coefficient:
+-   Estimate" column: Provides the estimated value of the coefficient.
+-   "Std. Error" column: Provides the standard error of the estimate.
+-   "t value" column: Gives the t-statistic for the hypothesis test.
+-   "Pr(>|t|)" column: Provides the p-value for the hypothesis test.
+
+From above can see p value = 3.7 > than 0.05, hence Null hypothesis is accpeted. But that aint right in reality as the relation between sales and profit aint entirely positive and straight.
+
+\
+Diagnostic Plot:
+```{r}
+model <- lm(Sales ~ Profit, Superstore_data)
+
+gg_resfitted(model) +
+  theme_minimal()
+```
+-   For this particular plot, we can already see that one of our assumptions is being violated, in that the variance in errors increases for certain higher sales prices.
+
+**Error Metrics**
+Not that important in inferential statistics , 
+```{r}
+#sum of squared errors
+sse <- sum(model$residuals ^ 2)
+
+# mean squared error
+mse <- mean(model$residuals ^ 2)
+
+# root mean squared error
+rmse <- sqrt(mse)
+
+# mean absolute error
+mae <- mean(abs(model$residuals))
+
+# mean absolute percent error
+mape <- mean((abs(model$residuals) + 1) / 
+               (predict(model) + 1))
+
+c('sse' = sse, 'mse' = mse, 'rmse' = rmse, 'mae' = mae, 'mape' = mape)
+```
+
+**4. Part 4:** Include at least one other variable into your regression model (e.g., you might use the one from the ANOVA), and evaluate how it helps (or doesn't).
+
+-   Lets add in another variable as Profit to the initial ANOVA test Hypothesis Test. Hence the **Response variable = Sales** and **Explanatory Variable = Region and profit**
+
+-   But before doing that lets narrow down the dataset so that we look at only Profits and not lossed (i.e. negative values within Profit which indicate loss)
+
+-   we'll create a subset of the Superstore dataset (with profit that is values > =0 ), and we'll create a new column that "binarizes" the region column into "Central and West " or "East and North".
+```{r}
+sup_basic <- Superstore_data |>
+  filter( Profit >= 0) |>
+  mutate(Region_split = ifelse(Region %in%
+           c("Central"),
+           1, ifelse(Region %in%
+           c("West"),
+           2,ifelse(Region %in%
+           c("East"),
+           3, 4))))
+
+sup_basic |>
+  group_by(Region_split) |>
+  summarize(num = n())
+
+```
+
+-   Suppose we're interested in modeling the Product sales using the Region_split column as well as the Profit. We are going to want to draw the same kinds of conclusions above about how the Sales changes with either of these variables. So, in the same way that we need both to maintain a linear relationship with the sale_price, if one variable is held constant, we need the other to maintain a linear relationship, and vice versa.
+
+```{r}
+sup_grouped <-
+  sup_basic |>
+  group_by(Region_split) |>
+  summarise(mean_price = mean(Sales))
+
+sup_basic |>
+  ggplot() +
+  facet_wrap(vars(Region_split), labeller = label_both) +
+  geom_point(mapping = aes(x = Profit, y = Sales)) +
+  geom_hline(data = sup_grouped,
+             mapping = aes(yintercept = mean_price),
+             color = 'darkorange', linetype = 'dashed') +
+  scale_y_continuous(labels = \(x) paste("$", x / 1000, "K")) +
+  labs(title = "Sales Price by Profit",
+       subtitle = "Faceted by the Region where products are bought",
+       x = "Profit", y = "Sales") +
+  theme_minimal()
+```
+
+
+
+```{r}
+model <- lm(Sales ~  Profit + Region_split, data = sup_basic)
+
+model$coefficients
+
+```
+-   We can interpret our coefficients thus:
+
+    -   (non-realistic) If there is no Profit, and the Region is not within Central and West, the expected sales price is roughly $100.
+    -   If the (binary) Region remains as it is i.e. irrespective of it, and we add a single unit of Profit, then we can expect the sale_price to increase by about $2.5.
+    -   If the Profit remains as it is, and we go from Centralto west to East to North, then we can expect the sale_price to decrease by about $4.
+
+
+-   Maybe include an interaction term, but explain why you included it.
+    -    **Interaction Terms**
+
+    -    Sometimes, we have a relationship between two variables such that the line formed between one and the response changes based on the other.
+    
+    ```{r}
+    sup_basic |>
+  ggplot(mapping = aes(x = Profit, y = Sales,
+                       color = factor(Region_split))) +
+  geom_jitter(height = 0, width = 0.1, shape = 'o', size = 3) +
+  geom_smooth(method = 'lm', se = FALSE, linewidth = 0.5) +
+  scale_y_continuous(labels = \(x) paste("$", x / 1000, "K")) +
+  scale_color_brewer(palette = 'Dark2') +
+  labs(title = "Sales Price by Profit",
+       subtitle = "Colored by the Region of product bought (1= Central; 2= West; 3 = East;  4= North)",
+       x = "Profit (x-jittered)", y = "Sales",
+       color = 'Region split i.e. 1= Central; 2= West; 3 = East;  4= North?') +
+  theme_hc()
+    ```
+    
+-   Since points are all overlapping, becomes difficult to interpret the added interaction Terms.
+we cant really see/differentiate that when the region changes, the Profit does not really affect the Sales price much for North and Central Region. But, when it is West, an increase in Profit has a slightly positive effect on Sales Price. Same for East region.
+
+```{r}
+model <- lm(Sales ~ Profit + Region_split 
+            + Profit:Region_split, sup_basic)
+
+# to view more coefficients a bit easier
+tidy(model) |>
+  select(term, estimate) |>
+  mutate(estimate = round(estimate, 1))
+```
+
+
+I dont think it is a good idea to create an interaction term for the same.However to interpret the results, we can have say the following:
+
+-   we only need to worry about the fact that a product having a Profit will tend to have a sales price of about $2.1 more.
+
+-   On the other hand, if the region is other, then we have a Profit (in this case) will tend to be $(2.1 + $0.2 = $2.3) more.

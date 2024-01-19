@@ -1,0 +1,157 @@
+
+1 more data dive , and quiz
+
+Next week - Project talk, just spending time snd figuring doubts
+
+PROJECT -
+writeup : 
+similar to each weeks data dive, code, visulaiztion, insights etc etc
+
+figure out what can interest 
+
+
+presentation : Record with face, 
+
+2 things to submit 
+-> 
+-> 
+
+
+------------------------
+
+COMMUNICATING STATS:
+
+Translating business terms to stats - 
+
+
+Data storytelling - 
+
+
+Communication Best Practices -
+
+
+Note on error metrics -
+
+
+=================================
+
+Translating business terms to stats - 
+----------
+case 1: Ask questions, by going through conversations (along with EDA), to better understand the data.
+
+case 2: Business is particularly interested in something,
+ -  Attempt to answer it with EDA
+ -  Propose a stst analysis and iterate on the idea (like do A/B test for the data done 1 year back, to )
+
+Things to do :
+1. Set a scope (what to include / exclude): variables to take or not , tests/models to run
+   (what data we are going to use? and what )
+2. Set a success criteria : define ahead of time, what needs to be done? 
+   eg: valid interpretation then can we move on ? without which
+3. Plan for use : How will the results be implemented? (manage risks)
+4. Open up your questions to criticism, and iterate
+
+(* if our opinion and findings are not what the superior says -
+   A: listen to superior as they have communication to stakeholders and other superiors.
+   B: you are the expert as the data is with you, talk to other teams like marketing and stuff to understand better to retalk about the ideas.
+)
+
+
+
+
+Data storytelling - 
+---------
+like say we have a question -> business related , so we evaluate it and got to communicate our work.
+
+
+
+1. Define a scope : ignore data which is unrelated to the project, provide justification of why we are not including it.
+
+Is it difficult to build a sentence with the data and topic?
+(eg -player stats is the need of the hour.  dont go question : how the player make money based on merchandise ? then only take it and neglect rest)
+
+dont go searching which is not  required.
+
+Key points - MORE SALIENT AND AUDIENCE (so less distracted)
+
+[EXAMPLE - Find houses without basements (price), how to pick variables??
+ -> Find targets (sales_rpice) and try finding correlation between the other variables and pick those.  
+ -> To confirm on those, speak with colleagues to undertsnad if the variables we picked is workable.
+]
+
+2. Filter signal (relation/ standing out) from the Noise : 
+Signals (detected during EDA) 
+- strong correlations 
+- skewed distributions 
+- intutitive hypothesis with substanticial evidence against them.
+
+Weak signals - scattered plot, then they state there is no proper relation between the variables. 
+couple of data that stand out/outliers (if they are not intuitive , can be looked into later).
+
+(when checking a data, draw histogram - to understand if right skewed? if outliers are there? what can be told about the neighbourhood)
+
+3. Consider the sudience
+-  who will this story be shared to? 
+(team of analysts? )
+helps in finding evidence and try to challenge their current workk
+
+- how to present the story?
+  Tech vs general layman terms
+  Extremely in depth oe focused on useful parts
+  stats aspects vs strategic concerns of the company
+
+- consider the audience
+  Can say abt clear variables based on their background.
+  report shouldnt be there direct in the presentation. 
+
+
+4. Identify effective Data Visualization :
+  Such that they are effective.
+  Build visualization to communicate a single message.
+  (avoid the clutter by dividing the data to sections if they are separate clusters)
+  Title is important, so add that to explain the visualization
+  Be clear 
+  remove background grey if its unnecessary
+
+	
+5. Provide Context :
+  Present situation and purpose before presenting findings
+  Link all findings to the situation and purpose.
+(all insights should be tied to a result that can bring about actions in the future)
+
+6. Structure your story like a story :
+  ***** This is what we need to look into while speaking about it in the clas/work *****
+	1. Introduction - set the stage
+	2. Rising action - build tension, introduce conflict.
+	3. Climax - provide a crucial moment or insight (Main Inisght)
+	4. Falling action -  resolve conflicts
+	5. Denouncemnt - final resolution and retrospection
+
+7. Edit your story: 
+
+  Get feedback from audience.
+  Expect something to be unclear
+  welcome criticism
+
+
+Communication Best Practices -
+-------
+1. gauge individuals technical expertise : clarify based on vocab
+   invite questions
+consider preferances and sensitives like atmosphere, attitude, and directness
+
+2. Focus on the client, not the concepts: (dont put p-value if not everyone is aware of it.)
+
+(Euclids - book of elements)
+3. Open yourself to feedback
+
+
+4. Plan for contngencies
+  structure the converstaion/presentation
+  anticipate questions
+
+5. Be humble, but confident
+
+
+Note on error metrics -
+-------

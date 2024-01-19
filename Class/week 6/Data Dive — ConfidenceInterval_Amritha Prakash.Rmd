@@ -1,0 +1,546 @@
+---
+title: "Data Dive - Confidence Intervals"
+author: "Amritha Prakash"
+date: "2023-09-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 6
+
+### Task(s)
+
+-   Part 1: Build at least three sets of variable combinations
+
+    -   For each set of variables, include at least one column that you created (i.e., calculated based on others)
+    -   All variables for this data dive should be either continuous (i.e., numeric) or ordered (e.g., ['small', 'medium', 'large'] is okay, but ["apples", "oranges", "bananas"] is not)
+    -   For each set, there should be one response variable with the others as explanatory variables
+
+-   Part 2: Plot a visualization for each response-explanatory relationship, and draw some conclusions based on the plot
+
+    -   Use what we've covered so far in class to scrutinize the plot (e.g., are there any outliers?)
+
+-   Part 3: Calculate the appropriate correlation coefficient for each of these combinations
+
+    -   Explain why the value makes sense (or doesn't) based on the visualization(s)
+
+-   Part 4: Build a confidence interval for each of the response variables. Provide a detailed conclusion of the response variable (i.e., the population) based on your confidence interval.
+
+------------------------------------------------------------------------
+
+### **Read the Data**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(tidyverse)
+library(dplyr)
+library(ggthemes)
+```
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+
+------------------------------------------------------------------------
+
+## **1. Set 1: -** Predicting Profit
+
+------------------------------------------------------------------------
+
+-   Build at least three sets of variable combinations
+
+    -   Response Variable: Profit
+    -   Explanatory Variables: Sales, Quantity, Discount
+    -   Set 1
+
+```{r}
+superstore_set_1 <- Superstore_data |>
+  select(Sales, Quantity, Discount, Profit)
+head(superstore_set_1)
+
+```
+
+-   In the above set, will try to find a relation between each explanatory variable i.e. sales, quantity and discount with Profit.
+
+------------------------------------------------------------------------
+
+-   Within set1, Visualization for each response-explanatory relationship. Further calculation of Correlation and identifying the confidence Interval:
+
+
+    1.  PROFIT VS SALES -
+
+    -   Create a scatterplot for Profit vs. Sales
+
+    ```{r}
+    ggplot(data = superstore_set_1, aes(x = Sales, y = Profit))+
+    geom_point() +
+    labs(x = "Sales", y = "Profit") +
+    ggtitle("Profit vs. Sales") +
+      theme_hc()
+
+
+    ```
+
+    -   Not a clear linear relation between Profit and sales. But can see for most it follows the linear trend, i.e. as the sale prices increase the profit also increases.
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Profit and Sales
+
+    ```{r}
+    correlation_coefficient <- round(cor(superstore_set_1$Profit, superstore_set_1$Sales),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Positive value of Correlation indicates that there is somewhat linear relationship between Profit and Sales.
+
+    -   So can say that the visualization and Correlation speak the same that there is somewhat linear correlation between Profit and Sales.
+    
+    \
+
+    2.  PROFIT VS QUANTITY -
+
+    -   Create a scatterplot for Profit vs. Quantity
+
+    ```{r}
+    ggplot(data = superstore_set_1, aes(x = Quantity, y = Profit))+
+    geom_point() +
+    labs(x = "Quantity", y = "Profit") +
+    ggtitle("Profit vs. Quantity") +
+      theme_hc()
+
+
+    ```
+
+    -   Not a clear relation between Profit and Quantity. All points are scattered all over.
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Profit and Quantity
+
+    ```{r}
+    correlation_coefficient <- round(cor(superstore_set_1$Profit, superstore_set_1$Quantity),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Here correlation between Profit and quantity is near zero,i.e. points are randomly scattered.
+
+    -   So can say that the visualization and Correlation speak the same that there is somewhat no particular relation which can be predicted from Profit and quantity.
+
+
+
+
+    3.  PROFIT VS DISCOUNT -
+
+    -   Create a scatterplot for Profit vs. discount
+
+    ```{r}
+    ggplot(data = superstore_set_1, aes(x = Discount, y = Profit))+
+    geom_point() +
+    labs(x = "Discount", y = "Profit") +
+    ggtitle("Profit vs. Discount") +
+      theme_hc()
+
+
+    ```
+
+    -   Can see it follows the negative linear trend, i.e. as the discount increases the profit descreases
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Profit and Discount
+
+    ```{r}
+    correlation_coefficient <- round(cor(superstore_set_1$Profit, superstore_set_1$Discount),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Here correlation between Profit and Discount is negative,i.e. strong information about the how negatively discount affects profit.
+
+    -   So can say that the visualization and Correlation speak the same that there is negative correlation that can be predicted between Profit and Discount. So it is not a good idea to give discounts if the superstore is looking for Profits.
+
+------------------------------------------------------------------------
+
+Assuming, If we want to calculate a 95% confidence interval for the "Profit" variable:
+
+```{r}
+print(paste("Min of Profit",min(superstore_set_1$Profit)))
+print(paste("Max of Profit",max(superstore_set_1$Profit)))
+```
+
+```{r}
+# Calculate the sample mean and standard error of the mean for the Profit variable
+profit_mean <- mean(superstore_set_1$Profit)
+profit_se <- sd(superstore_set_1$Profit)/sqrt(length(superstore_set_1$Profit))
+
+# Calculate the t-critical value for the 95% confidence interval with 10 degrees of freedom
+t_critical <- qt(0.975, df = 10)
+
+# Calculate the margin of error
+margin_of_error <- t_critical * profit_se
+
+# Construct the 95% confidence interval for the Profit variable
+profit_ci_upper <- profit_mean + margin_of_error
+profit_ci_lower <- profit_mean - margin_of_error
+
+print(paste("Confidence level of Profit: ",profit_ci_lower," to ",profit_ci_upper))
+
+```
+
+-   Also, we know the Profit min and max to be -6599.978 and 8399.976 respectively
+-   From above can figure out that the Confidence Inetrval for Profit to be between the range 23.4356892364713  to  33.878103379098.
+-   This states that 95 out of 100 times the true population mean would exist within the Confidence Interval of 23.4356892364713 to 33.878103379098.
+
+
+
+
+
+## **2. Set 2: -** Predicting Sales
+
+------------------------------------------------------------------------
+
+-   Build at least three sets of variable combinations
+    -   Response Variable: Sales
+    -   Explanatory Variables: Quantity, Discount, Category (convert to numeric, e.g., Furniture: 1, Office Supplies:2)
+
+```{r}
+#Region Category to numbers   
+unique(Superstore_data$Category)
+
+```
+
+```{r}
+# Create a new column for region_numeric
+Superstore_data <- Superstore_data %>%
+  mutate(Category_numeric = recode(Category, "Furniture" = 1, "Office Supplies" = 2, "Technology" = 3))
+
+
+Superstore_data |> select(Category,Category_numeric) |> head()
+
+```
+
+
+
+-   Set2
+
+```{r}
+superstore_set_2 <- Superstore_data |>
+  select(Quantity,Discount,Category,Category_numeric, Sales)
+head(superstore_set_2)
+```
+
+In this above set, will try to predict the sales (response variable) based on quantity, discount, and category.
+
+------------------------------------------------------------------------
+
+
+
+-   Within set2, Visualization for each response-explanatory relationship. Further calculation of Correlation and identifying the confidence Interval:
+
+
+
+    1.  SALES VS QUANTITY -
+
+    -   Create a scatterplot for Sales vs. Quantity
+
+    ```{r}
+    ggplot(data = superstore_set_2, aes(x = Quantity, y = Sales))+
+    geom_point() +
+    labs(x = "Quantity", y = "Sales") +
+    ggtitle("Sales vs. Quantity") +
+      theme_hc()
+
+
+    ```
+
+    -   Not a clear relation between Sales and Quantity. All points are scattered over the region where sale is less, while quantity vary in there.
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Quantity and Sales
+
+    ```{r}
+    correlation_coefficient <- round(cor(superstore_set_2$Quantity, superstore_set_2$Sales),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Positive value of Correlation indicates that there is somewhat linear relationship between Quantity and Sales. But since the value is nearby 0 i.e. it is 0.2. I would say that not much can be said. There is not much strength in the relationship between Sales and Quantity
+
+    -   So conclusively, can say that the visualization and Correlation speak the same that there is not much which can be figured between the parameters - Quantity and sales.
+
+    2.  SALES VS DISCOUNT -
+
+    -   Create a scatterplot for Sales vs. Discount.
+
+    ```{r}
+    ggplot(data = superstore_set_2, aes(x = Discount, y = Sales))+
+    geom_point() +
+    labs(x = "Discount", y = "Sales") +
+    ggtitle("Sales vs. Discount") +
+      theme_hc()
+
+
+    ```
+
+    -   Not a clear relation between Sales and Discount. All points are somewhat scattered over the region but if we closely look as the discount increases the sale decreases.
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Discount and Sales
+
+    ```{r}
+    correlation_coefficient <- round(cor(superstore_set_2$Discount, superstore_set_2$Sales),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Negative value of Correlation indicates that there is not a a support between the parameters. But since the value is small negative value which is nearby 0 i.e. it is -0.3. I would say that not much can be said. There is not much strength in the relationship between Sales and Discount, stating that they dont go together well. Majorly, can say that it is not giving much information.
+
+    -   So conclusively, can say that the visualization and Correlation speak the same that there is not much which can be figured between the parameters - Discount and sales.
+
+    3.  SALES VS CATEGORY -
+
+    -   Create a scatterplot for Sales vs. Category
+
+    ```{r}
+    ggplot(data = superstore_set_2, aes(x = Category_numeric, y = Sales))+
+    geom_point() +
+    labs(x = "Category_numeric (Furniture = 1, Office Supplies = 2, Technology = 3 )", y = "Sales") +
+    ggtitle("Sales vs. Category_numeric") +
+      theme_hc()
+
+
+    ```
+
+Here 1,2 and 3 in category_numeric indicate the following categories - "Furniture" = 1, "Office Supplies" = 2, "Technology" = 3
+
+
+-   Not a clear relation between Sales and Category. All points are somewhat scattered over the region but if we closely look as the Category tends to be Technology the Sales keep increasing. Stating that there can be a positive relation when the category of products bought are of the order Technology > Office Supplies > Furniture.
+
+-   Calculate the appropriate correlation coefficient between two variables,i.e. between Quantity and Sales
+
+```{r}
+correlation_coefficient <- round(cor(superstore_set_2$Category_numeric, superstore_set_2$Sales),2)
+
+# Print the correlation coefficient
+print(correlation_coefficient)
+```
+
+-   Positive value of Correlation indicates that there is slight relation between the parameters. But since the value is small positive value which is nearby 0 i.e. it is 0.04. I would say that not much can be said. There is not much strength in the relationship between Sales and Category. Majorly, can say that it is not giving much information.
+
+-   So conclusively, can say that the visualization and Correlation speak the same that there is not much which can be figured between the parameters - Category and sales. Maybe can state that with respect to certain category of products the sales may go up but not much can be figured out with such a correlation value.
+
+
+------------------------------------------------------------------------
+
+Assuming, If we want to calculate a 95% confidence interval for the "Sales" variable:
+
+```{r}
+print(paste("Min of Sales",min(superstore_set_2$Sales)))
+print(paste("Max of Sales",max(superstore_set_2$Sales)))
+```
+
+```{r}
+# Calculate the sample mean and standard error of the mean for the Profit variable
+sales_mean <- mean(superstore_set_2$Sales)
+sales_se <- sd(superstore_set_2$Sales)/sqrt(length(superstore_set_2$Sales))
+
+# Calculate the t-critical value for the 95% confidence interval with 10 degrees of freedom
+t_critical <- qt(0.975, df = 10)
+
+# Calculate the margin of error
+margin_of_error <- t_critical * sales_se
+
+# Construct the 95% confidence interval for the Profit variable
+sales_ci_upper <- sales_mean + margin_of_error
+sales_ci_lower <- sales_mean - margin_of_error
+
+print(paste("Confidence level of Sales: ",sales_ci_lower," to ",sales_ci_upper))
+
+```
+
+-   Also, we know the Profit min and max to be 0.444 and 22638.48 respectively
+-   From above can figure out that the Confidence Inetrval for Profit to be between the range 215.967066697444  to  243.748934963553.
+-   This states that 95 out of 100 times the true population mean would exist within the Confidence Interval of 215.967066697444  to  243.748934963553.
+
+## **3. Set 3: -** Predicting Discount at which products are sold
+
+-   Build at least three sets of variable combinations
+
+    -   Response Variable: Discount
+    -   Explanatory Variables: Quantity, Region (by converting to numeric), Ship Mode (convert to numeric representation)
+
+```{r}
+#Region convert to numbers for correlation  purpose  
+unique(Superstore_data$Region)
+
+```
+
+```{r}
+# Create a new column for region_numeric
+Superstore_data <- Superstore_data %>%
+  mutate(Region_numeric = recode(Region, "South" = 1, "West" = 2, "East" = 3, "Central" = 4))
+
+
+Superstore_data |> select(Region,Region_numeric) |> head()
+
+```
+
+```{r}
+# ShipMode convert to numbers for correlation  purpose
+unique(Superstore_data$Ship.Mode)
+
+```
+
+```{r}
+Superstore_data <- Superstore_data %>%
+  mutate(ShipMode_numeric = recode(Ship.Mode, "Same Day"= 1, "First Class" = 2, "Second Class" = 3, "Standard Class" = 4))
+
+
+Superstore_data |> select(Ship.Mode,ShipMode_numeric) |> head()
+
+```
+
+         
+-   Set3
+
+
+```{r}
+superstore_set_3 <- Superstore_data |>
+  select(Quantity,Region,Region_numeric,Ship.Mode,ShipMode_numeric,Discount)
+head(superstore_set_3)
+```
+
+In the above set, will try to find a relation between each explanatory variable i.e. Discount, Region and ShipMode with Quantity
+
+------------------------------------------------------------------------
+
+-   Within set3, Visualization for each response-explanatory relationship. Further calculation of Correlation and identifying the confidence Interval:
+
+    1.  DISCOUNT VS QUANTITY -
+
+    -   Create a scatterplot for Discount vs. Quantity
+
+    ```{r}
+    ggplot(data = superstore_set_3, aes(x = Quantity, y = Discount))+
+    geom_point() +
+    labs(x = "Quantity", y = "Discount") +
+    ggtitle("Discount vs. Quantity") +
+      theme_hc()
+
+
+    ```
+
+    -   Not a clear relation between Discount and Quantity. All points are scattered over the plot.
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Quantity and Discount
+
+    ```{r}
+      correlation_coefficient <- round(cor(superstore_set_3$Quantity, superstore_set_3$Discount),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Positive value of Correlation indicates that there is somewhat linear relationship between Quantity and Discount. But since the value is nearby 0 i.e. it is 0.01. I would say that not much can be said. There is not much strength in the relationship between Discount and Quantity. Or even there is no corelation between those 2 parameters
+
+    -   So conclusively, can say that the visualization and Correlation speak the same that there is not much which can be figured between the parameters - Quantity and Discount.
+
+    2.  DISCOUNT VS REGION -
+
+    -   Create a scatterplot for Region vs. Discount.
+
+    ```{r}
+    ggplot(data = superstore_set_3, aes(x =Region_numeric , y = Discount))+
+    geom_point() +
+    labs(x = "Region_numeric (South = 1, West = 2, East = 3, Central = 4)", y = "Discount") +
+    ggtitle("Discount vs. Region_numeric ") +
+      theme_hc()
+
+
+    ```
+
+    -   Not a clear relation between Region and Discount. All points are somewhat scattered over the region.
+
+    -   Calculate the appropriate correlation coefficient between two variables,i.e. between Discount and Region
+
+    ```{r}
+    correlation_coefficient <- round(cor(superstore_set_3$Discount, superstore_set_3$Region_numeric),2)
+
+    # Print the correlation coefficient
+    print(correlation_coefficient)
+    ```
+
+    -   Positive value of Correlation indicates that there is somewhat linear relationship between Quantity and Discount. But since the value is nearby 0 i.e. it is 0.18. I would say that not much can be said. There is not much strength in the relationship between Discount and Region Or even there is no corelation between those 2 parameters
+
+    -   So conclusively, can say that the visualization and Correlation speak the same that there is not much which can be figured between the parameters - Discount and Region.
+
+    3.  DISCOUNT VS SHIPMODE -
+
+    -   Create a scatterplot for Discount vs. ShipMode
+
+    ```{r}
+    ggplot(data = superstore_set_3, aes(x = ShipMode_numeric, y = Discount))+
+    geom_point() +
+    labs(x = "ShipMode_numeric (Same Day= 1, First Class = 2, Second Class = 3, Standard Class = 4)", y = "Discount") +
+    ggtitle("Discount vs. ShipMode_numeric") +
+      theme_hc()
+
+
+    ```
+
+Here 1,2, 3 and 4 in ShipMode_numeric indicate the following categories -Same Day= 1, First Class = 2, Second Class = 3, Standard Class = 4
+
+         
+-   Not a clear relation between ShipMode_numeric and Discount, All points are somewhat scattered over the plot.
+
+-   Calculate the appropriate correlation coefficient between two variables,i.e. between ShipMode and Discount.
+
+```{r}
+correlation_coefficient <- round(cor(superstore_set_3$ShipMode_numeric, superstore_set_3$Discount),2)
+
+# Print the correlation coefficient
+print(correlation_coefficient)
+```
+
+-   Positive value of Correlation indicates that there is slight relation between the parameters. But since the value is small positive value which is nearby 0 i.e. it is 0.01. I would say that not much can be said. There is not much strength in the relationship between Discount and ShipMode. Majorly, can say that it is not giving much information.
+
+-   So conclusively, can say that the visualization and Correlation speak the same that there is not much which can be figured between the parameters - Discount and ShipMode. 
+
+
+------------------------------------------------------------------------
+
+Assuming, If we want to calculate a 95% confidence interval for the "Discount" variable:
+
+```{r}
+print(paste("Min of Discount",min(superstore_set_3$Discount)))
+print(paste("Max of Discount",max(superstore_set_3$Discount)))
+```
+
+```{r}
+# Calculate the sample mean and standard error of the mean for the Profit variable
+dist_mean <- mean(superstore_set_3$Discount)
+dist_se <- sd(superstore_set_3$Discount)/sqrt(length(superstore_set_3$Discount))
+
+# Calculate the t-critical value for the 95% confidence interval with 10 degrees of freedom
+t_critical <- qt(0.975, df = 10)
+
+# Calculate the margin of error
+margin_of_error <- t_critical * dist_se
+
+# Construct the 95% confidence interval for the Profit variable
+Discount_ci_upper <- dist_mean + margin_of_error
+Discount_ci_lower <- dist_mean - margin_of_error
+
+print(paste("Confidence level of Sales: ",Discount_ci_lower," to ",Discount_ci_upper))
+
+```
+
+-   Also, we know the Discount min and max to be 0 and 0.8 respectively.
+-   From above can figure out that the Confidence Interval for Discount to be between the range 0.151601304494897  to  0.160804138771062.
+-   This states that 95 out of 100 times the true population mean for discount would exist within the Confidence Interval of 0.151601304494897  to  0.160804138771062

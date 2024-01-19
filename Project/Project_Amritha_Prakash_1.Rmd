@@ -1,0 +1,965 @@
+---
+title: "Project_R"
+author: "Amritha Prakash"
+date: "2023-11-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+----------
+
+# **PURPOSE OF THE PROJECT -**  
+
+Overall the goal of this project is to analyze the superstore data and allow businesses to gain insights, make informed decisions, and optimize their operations with the help of Visualization & statistics. Few of the areas which can be looked into are -  
+
+-   Improving Sales and Revenue  
+-   Enhancing Customer Experience  
+-   Competitive Analysis between Categories  
+-   Competitive Analysis between Regions  
+-   Supply Chain Optimization  
+-   Market Basket Analysis  
+-    Risk Management  
+  
+For the business of Super Store to grow, Ill be looking into various features, so that they can understand if they need to make any improvements on their Marketing or even any additional steps needs to be taken.  
+
+In the below part of the project, my aim is to  
+-   figure better ways to increase sales in particular Region say California.   
+-   to check if categories play major role in deciding if sales would go up or down, if average sales for different categories is same.  
+-   overall sales over the years, if any changes need to be implemented to up the game of Sales.  
+
+
+
+## Statitics Framework -
+
+We know that a lot of data exists in this world, and in order to analyse and get some inference of the same we need to go through a few steps. Statistics follows a framework which includes -  
+1. Obtaining an idea, as to an hypothesis based on certain element in the world (HYPOTHESIS)   
+2. Observing nature to obtain such kind of related data. ( SAMPLE DATA from POPULATION )   
+3. Recognize that the data collected is one out of the many observations in the world. ( PERFORM EXPLORATORY DATA ANALYSIS [EDA] )  
+4. Finding evidence against the idea by Insights ( PERFORM HYPOTHESIS TESTING -> Pulling reports)  
+5. Checking if the hypothesis matches our assumption.  
+
+Hence, as a part of the same framework I would be working to create a similar scenario ON SUPERSTORE Data as a part of my Project in order to infer certain insights for a business.
+
+--------
+
+## Data -
+
+As per my research and understanding I came across **Superstore data** in the initial week of the semester, which involved quite a lot of categorical and numerical features. This made me think about the various possibilities of what can be interpreted from the same data set. Following are the names of the columns -  
+- Ship Mode  
+- Segment  
+- Country  
+- City  
+- State  
+- Region  
+- Category  
+- Sub-Category  
+- Postal Code  
+- Sales
+- Quantity  
+- Discount  
+- Profit  
+
+
+Also, while working through, I came across a super set of the same data set with additional columns. 
+These are the additional Columns -  
+- Order Id  
+- Order Date  
+- Ship Date  
+- Customer ID  
+- Customer Name  
+- Product Name  
+- Product ID  
+
+
+Hence, am working with the compiled Super set of the data for **SuperStore Dataset** with 21 columns, as a part of this Project. 
+
+
+  
+### Data Pre-Processing - 
+
+First to create an idea about the Superstore and the orders being placed, did some Data Pr-processing to understand it better.  
+
+1.There are 9994 rows for Super Store Data. The Data is tidy with about 21 columns, Each row represents a unique and separate observation.  
+The same can be seen through the data cleaning / pre-processing 
+```{r}
+knitr::opts_chunk$set(echo = FALSE)
+# load libraries 
+
+library(tidyverse)
+library(dplyr)
+library(ggthemes)
+library(ggrepel)
+# time series toolkits
+library(xts)
+library(tsibble)
+
+```
+
+```{r}
+
+Superstore_data=read.csv("US_Superstore_data.csv")
+head(Superstore_data)
+```
+
+
+Change format of 2 columns to Date Format (Data Cleaning) :-
+```{r}
+Superstore_data <- Superstore_data %>%
+  mutate(Order.Date = as.Date(Superstore_data$Order.Date , format = "%d-%m-%Y"),
+         Ship.Date = as.Date(Superstore_data$Ship.Date , format = "%d-%m-%Y"))
+head(Superstore_data)
+```
+
+
+
+Number of Records -  
+```{r}
+# Number of  records -
+nrow(Superstore_data)
+```
+
+Various columns within the Data set:-  
+```{r}
+colnames(Superstore_data)
+
+```
+
+
+**Summarize the Data set -**  
+*   For categorical columns, this should include unique values and counts
+
+1.Column Ship Mode :- 
+
+Unique values for the column - Ship Mode :-
+```{r}
+for (x in unique(Superstore_data$Ship.Mode)) {
+  print(x)
+}
+```
+Count of Unique Ship Modes :-
+```{r}
+n_distinct(Superstore_data$Ship.Mode)
+```
+
+2.Column Segment :-
+
+Unique values for the column - Segment :-
+```{r}
+for (x in unique(Superstore_data$Segment)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Segments: %s", n_distinct(Superstore_data$Segment))
+
+```
+3.Column Country :-
+
+Unique values for the column - Country
+```{r}
+for (x in unique(Superstore_data$Country)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Countries: %s", n_distinct(Superstore_data$Country))
+
+```
+Here above, we can see that the data exists only for United States, so while working with data we can remove this column as it is redundant.
+
+
+4.Column City :-
+
+Unique values for the column - City
+```{r}
+unique(Superstore_data$City)
+```
+5.Column State :-
+
+Unique values for the column - State
+```{r}
+unique(Superstore_data$State)
+```
+
+``` {r}
+sprintf("Count of the unique States: %s", n_distinct(Superstore_data$State))
+
+```
+
+6.Column Region :
+
+Unique values for the column - Region
+```{r}
+for (x in unique(Superstore_data$Region)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Regions: %s", n_distinct(Superstore_data$Region))
+
+```
+7.Column Category :-
+
+Unique values for the column - Category
+```{r}
+for (x in unique(Superstore_data$Category)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the unique Categories: %s", n_distinct(Superstore_data$Category))
+
+```
+8.Sub-Category :-
+
+Unique values for the column - Sub-category
+```{r}
+sprintf("Unique values for the column - Sub-Category :"); 
+for (x in unique(Superstore_data$Sub.Category)) {
+  print(x)
+}
+```
+
+```{r}
+sprintf("Count of the Sub-Category: %s", n_distinct(Superstore_data$Sub.Category))
+
+```
+9.Postal Code :-
+
+Even though Postal code is numeric in nature, it doesn't have any value as the mean of a postal code wouldn't make sense. Hence considering it as a Categorical value.
+
+Unique values for the column - Postal code : 
+```{r}
+unique(Superstore_data$Postal.Code)
+```
+10.Order Date :-
+
+Unique orders dates for the column - Order ID
+```{r}
+n_distinct(Superstore_data$Order.Date)
+```
+
+```{r}
+order_year_from_date <- year(Superstore_data$Order.Date)
+unique(order_year_from_date)
+```
+From above can see that the data is for 4 years.  
+
+11.Order ID :-
+
+Unique orders placed for the column - Order ID
+```{r}
+n_distinct(Superstore_data$Order.ID)
+```
+12.Ship Date  :-  
+
+Unique shipping dates for each order placed column - Ship Date
+```{r}
+n_distinct(Superstore_data$Ship.Date)
+```
+
+```{r}
+ship_year_from_date <- year(Superstore_data$Ship.Date)
+unique(ship_year_from_date)
+```
+From above can see that the data for shipping is uptill 2018 i.e. total 5 years.
+
+
+13.Customer ID :-  
+Unique Customers for each order placed column - Customer ID
+```{r}
+n_distinct(Superstore_data$Customer.ID)
+```
+
+14.Customer Name :-  
+Unique Customers for each order placed column, check using Customer Name
+```{r}
+n_distinct(Superstore_data$Customer.Name)
+```
+Count of Customer.ID and Customer.Name match i.e. 793, which states that data is not having issues.
+Because each Customer ID / Name is unique.
+
+15.Product Name  :-
+Unique Products purchased in the orders placed, check using Product Name
+```{r}
+n_distinct(Superstore_data$Product.Name)
+```
+All unique Products :-
+```{r}
+#unique(Superstore_data$Product.Name)
+# printing each 1850 products would be too much hence have commented the above code
+```
+
+16.Product ID  :-
+Unique Products purchased in the orders placed, check using Product Name
+```{r}
+n_distinct(Superstore_data$Product.ID)
+```
+For Products, maybe the Primary key could be the Product ID, somewhere certain product names repeat hence Product Name count is slighly less than Product ID.
+
+
+*   For numeric columns, this includes min/max, central tendency, and some notion of distribution (e.g., quantiles)  
+
+17.Sales :-
+```{r}
+summary(Superstore_data$Sales)
+
+```
+18.Quantity :-
+```{r}
+summary(Superstore_data$Quantity)
+
+```
+
+19.Discount :-
+```{r}
+summary(Superstore_data$Discount)
+```
+
+20.Profit :-
+```{r}
+summary(Superstore_data$Profit)
+```
+
+
+
+* Summaries Combined :
+```{r}
+summary(Superstore_data)
+```
+
+* Distinct Count of each column -
+```{r}
+sapply(Superstore_data,function(x) n_distinct(x))
+```
+
+
+### Data Documentation  
+  
+1.There are 16 categorical columns which are -
+Ship Mode, Segment, Country, City, State, Postal Code, Region, Category, Sub.Category, Order.ID, Order.Date, Ship.Date, Customer.ID, Customer.Name, Product ID, Product Name     
+(Here, considering Postal Code as Categorical as the numeric in the value does not have any significance. )
+
+2.While rest 4 columns are numerical/continuous in nature, they are - Sales(Price), Profit, Discount and Quantity, which are Decimal
+Also, Profit is having both positive and negative values. Negative values are indicating Loss.\
+-   *Sales* having a range of $0.444 to $22638.480 \
+-   *Profit* having a range starting from $-6599.978 to $8399.976 \
+-   *Discount* having a range from 0 to 0.8 \
+-   *Quantity* is numeric with a range starting from  1 to 14. \
+
+
+
+### Purpose of Data Collection:- 
+To figure out the sales and profit earned by the Superstore in various parts of USA. Further, it can be used to find trends in the same and come up with improvements. If there are any issues with current marketing or even certain marketing can help boost sales. All those can be inferred through analysis.
+
+Explanation of each Columns :
+
+1. Ship Mode - It has 4 values, they are First Class, Same Day, Second Class and Standard Class. Each value is defines the limit for being delayed as follows: - \
+Same day: >=0 days \
+First class: >=2 days \
+Second class: >=3 days \
+Standard class: >= 5 days \
+
+2. Segment - 
+It is the product sector.There are segments which are Consumer, Corporate and Home Office
+
+3. Country - 
+This column contains the country details. It was found to be only for United States i.e one value. Hence this column can be removed.
+
+4. City - 
+Various Cities present in United States.There are about 531 cities.
+
+5. State - 
+There are 49 states in this dataset.
+
+6. Postal Code - 
+There are 631 postal codes in this dataset
+
+7. Region - 
+There are 4 regions in the dataset. i.e. South, West, Central and East
+
+8. Category - 
+There are 3 categories, they are Furniture, Office Supplies and Technology.
+
+9. Sub-Category - 
+There are 17 sub-categories, some of them are - Bookcases, Chairs, Labels, Tables, Storage, Furnishings, Art, Phones, Binders, Appliances, Paper, Accessories, Envelopes, Fasteners, Supplies, Machines, Copiers
+
+10. Order Date :-
+There are about 1237 unique order dates, but overall from unique year and orders placed each year it seems to be increasing each year from time span starting from 2014 to 2017
+
+```{r}
+order_year_from_date <- Superstore_data |> mutate (year_order = year(Superstore_data$Order.Date) ) |>
+                        group_by(year_order) |>
+                        summarise(yearly_total_orders =n())
+unique(order_year_from_date)
+```
+  
+
+11. Order ID :- Unique orders placed for the column - Order ID
+```{r}
+n_distinct(Superstore_data$Order.ID)
+```
+12. Ship Date  :- 
+There are about 1334 unique ship dates, but overall from unique year, orders placed and shipped each year it seems to be increasing each year from time span starting from 2014 to 2017
+
+```{r}
+
+order_year_from_date <- Superstore_data |> mutate (ship_order = year(Superstore_data$Ship.Date) ) |>
+                        group_by(ship_order) |>
+                        summarise(yearly_total_shipped_orders =n())
+unique(order_year_from_date)
+```
+
+
+13. Customer ID & 14. Customer Name :-
+There are 793 customers in the Superstore dataset. Count of Customer.ID and Customer.Name match i.e. 793, which states that data is not having issues.Because each Customer ID / Name is unique.
+
+15. Product Name & 16. Product ID :-
+1862 Unique Products are purchased in the orders placed, this can be figured from the unique id of each.
+
+17. Sales - 
+It is the price. Having a range starting from $0.444 to $22638.480
+
+18. Profit - 
+It is the profit earned from the product. Can also indicate loss with a negative sign. Having a range -6599.978 to 8399.976
+
+19. Discount - 
+Discount given for the product purchased, range starts from 0 to 0.8. 
+
+20. Quantity - 
+The quantity of products bought, range starts from 1 to 14.
+
+  
+
+## Exploratory Data Analysis
+
+### 1. State wise Orders placed -  
+
+As it was seen above, there are about 49 states, plotting them all to understand the count of purchase is pretty difficult. Hence narrowing it down to top 10 states. Figuring out which state has the most purchases.  
+
+It would answer the question -> which are the top 10 states that have purchased the products from the Superstore?
+
+```{r}
+state_count<- aggregate(Superstore_data$State,by=list(Superstore_data$State), FUN=length)
+
+top_10_states_count <-state_count %>%
+arrange(desc(x)) %>%
+    slice(1:10) %>%
+  rename (
+    state=Group.1,
+    count=x
+  )
+top_10_states_count
+
+```
+
+-   From above analysis, we can say that California is the state where most Orders were placed, which is around 2001 in the entire time period starting from 2014 - 2017. Followed by New York at 1128 and Texas at 985  
+-   Plotting the Orders placed to visualize the actual difference between states  
+
+
+```{r}
+top_10_states_count |>
+  ggplot(mapping = aes(x=state, y=count, fill=state)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90)) +
+  ggtitle("Top 10 States with Most Products purchased")
+   
+
+```
+
+-  Further if we narrow down to latest year i.e. 2017, we can figure out orders placed for that year.  
+
+```{r}
+state_count<- Superstore_data |>
+  filter(year(Order.Date) == '2017') |>
+  group_by(State) |>
+  summarise(count = n())
+
+top_10_states_count <-state_count %>%
+arrange(desc(count)) %>%
+    slice(1:10) %>%
+  rename (
+    state=State,
+    count=count
+  )
+top_10_states_count
+
+#head(state_count)
+```
+
+```{r}
+top_10_states_count |>
+  ggplot(mapping = aes(x=state, y=count, fill=state)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90)) +
+  ggtitle("Top 10 States with Most Products purchased in the year 2017")
+   
+```
+
+-   Irrespective of the year, we can see that the orders placed in California is the largest.   
+    Further we can try to figure out which sub-category of products are bought most in the State of California for the year 2017. Maybe the business can focus to market those products better.
+
+```{r}
+# 663 orders in year 2017, 
+state_cali<- Superstore_data |>
+  filter(year(Order.Date) == '2017', State == "California")  
+#head(state_cali)
+
+california_Sub_category_count <- state_cali |>
+  group_by(Sub.Category) |>
+  summarise(count = n())
+
+top_10_sub_cat_count <-california_Sub_category_count %>%
+arrange(desc(count)) %>%
+    slice(1:10) %>%
+  rename (
+    state=Sub.Category,
+    count=count
+  )
+top_10_sub_cat_count 
+
+```
+
+-   In 2017, binders were the most purchased product in California, followed by paper, art, furnishings, and phones. Offering better discounts could potentially boost sales based on customer needs.
+
+
+-   The question is to determine the average discount given for each sub-category.
+```{r}
+# 663 orders in year 2017, 
+state_cali<- Superstore_data |>
+  filter(year(Order.Date) == '2017', State == "California")  
+#head(state_cali)
+
+california_Sub_category_discount <- state_cali |>
+  group_by(Sub.Category) |>
+  summarise(count = n(), average_discount = mean(Discount))
+#california_Sub_category_discount
+
+top_10_sub_cat_mean_dis <-california_Sub_category_discount %>%
+arrange(desc(count)) %>%
+    slice(1:17) %>%
+  rename (
+    Sub_Category=Sub.Category,
+    count=count
+  )
+top_10_sub_cat_mean_dis 
+```
+
+-   The data above indicates that relatively little product discounting was done in California. People bought regardless of the reductions as a result. Perhaps with more effective marketing, they could get more customers to purchase the goods.
+-   Additionally, since California is home to numerous tech companies, office supplies make up every product purchased there. We might be able to demonstrate it by looking up the Office supplies subcategories.
+
+```{r}
+state_cali |> select(Category, Sub.Category) |>
+  filter(Category == 'Office Supplies') |>
+  group_by(Category,Sub.Category) |>
+  distinct() |>
+  arrange(desc(Category))
+```
+
+-   In case of california all the products bought are office supplies. This indicates, maybe there was no marketing and it was indeed need of the hour. In conclusion, Better discounts and marketing can maybe increase sales in california and other western Tech based regions.
+
+
+### 2.The question is whether the sales trends for each state are consistent?
+
+we can check on the total sales obtained for those top 10 states, it would answer the questions like, 
+-   Are the states different when we plot for sales, when compared to orders placed over the time period of 2014 - 2017 ?
+
+```{r}
+state_sales_sum<- aggregate(Sales ~ State, data = Superstore_data , FUN=sum)
+
+top_10_states_sum <-state_sales_sum %>%
+arrange(desc(Sales)) %>%
+    slice(1:10) %>%
+  rename (
+    State= State,
+    Total_sales=Sales
+  )
+top_10_states_sum$Total_sales <- round(top_10_states_sum$Total_sales, digits = 0)
+top_10_states_sum
+
+```
+```{r}
+top_10_states_sum |>
+  ggplot(mapping = aes(x=State, y=Total_sales, fill=State)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()+
+   theme (axis.text.x =  element_text(angle=90)) +
+  ggtitle("Top 10 States with Total sales")
+```
+
+-   From above plot and value of total sales, can see that it is similar to count of products sold.
+-   California has the most sales (457687.63), followed by New York (310876.27), then Texas (170188.05) and so on. This is the same for count of products bought.
+
+```{r}
+Superstore_data_California <- Superstore_data %>%
+  filter(State == 'California')
+head(Superstore_data_California)
+```
+
+-   Considering if the business wants to know the trend for the most sales over the years in the state of California alone.   
+    This is possible by plotting a time series analysis graph.
+
+```{r}
+
+
+Superstore_data_ <- Superstore_data_California |>
+  group_by(Order.Date) |>
+  summarise(Total_sales = coalesce(sum(Sales),0)) 
+  
+head(Superstore_data_)
+```
+
+```{r}
+Superstore_data_ts <- as_tsibble(Superstore_data_, index=Order.Date) |>
+  fill_gaps() 
+
+head(Superstore_data_ts)
+```
+```{r}
+
+Superstore_data_ts$Total_sales[is.na(Superstore_data_ts$Total_sales)] <- 0
+head(Superstore_data_ts)
+
+```
+
+```{r}
+Superstore_data_ts|>
+ggplot() +
+   geom_line(mapping = aes( x= Order.Date, y = Total_sales))+
+   theme_hc()
+```
+
+
+#### Californias's Sales Trend  (2014 - 2017)
+-   The trend of a time series is the general increasing or decreasing of the response variable from the beginning of the time series to the end.      
+To illustrate this, we'll just look at a subset of our Total_Sales data, and we can use a linear model to illustrate increase or decrease.
+
+```{r}
+Superstore_data_ts |>
+  #filter_index("2016-01" ~ "2017-06") |>
+  ggplot(mapping = aes(x = Order.Date, y = Total_sales)) +
+  geom_line() +
+  geom_smooth(method = 'lm', color = 'blue', se=FALSE) +
+  labs(title = " Trend (2014 - 2017) ") +
+  theme_hc()
+```
+
+-   The blue line in this plot represents a linear fit to this time series data. This is not a very good model, but it indicates a trend as the total sales increases gtadually from early 2014 to 2017 . 
+
+
+#### Californias's Sales Trend  (2017)
+-   To closely look at the Trend of sales in California over the years, will plot only for the year 2017 .
+
+```{r}
+Superstore_data_ts |>
+  filter_index("2017-01" ~ "2017-12") |>
+  ggplot(mapping = aes(x = Order.Date, y = Total_sales)) +
+  geom_line() +
+  geom_smooth(method = 'lm', color = 'blue', se=FALSE) +
+  labs(title = " Total Sales for year 2017 ") +
+  theme_hc()
+```
+
+-   By looking at only one years trend of Total sales for the state of California (most orders placed = 663), we can see that the Sales are increasing for the year 2017.
+
+-   In conclusion, given that the sector is primarily tech-based, we can say that the company is not currently promoting its products. If this is the case, they may want to think about doing so in the future to draw in clients who are prepared to purchase office supplies.
+    And if they are already using marketing, they ought to keep doing so because it is helping them increase sales in the California area. 
+    In addition, since discounts are either nonexistent or extremely limited in California, businesses may consider implementing specific tactics to encourage customers to purchase their goods, such as providing discounts on infrequent days when sales are low and increasing the price of products on regular selling days. Furthermore, this ought to contribute to their overall sales growth. 
+
+
+#### California's Profit Trend  (2014 - 2017)
+-   Additionally, will examine into California's state profit trend. 
+```{r}
+Superstore_data_profit <- Superstore_data_California |>
+  group_by(Order.Date) |>
+  summarise(Total_profit = coalesce(sum(Profit),0)) 
+  
+
+
+Superstore_data_pr_ts <- as_tsibble(Superstore_data_profit, index=Order.Date) |>
+  fill_gaps() 
+Superstore_data_pr_ts$Total_profit[is.na(Superstore_data_pr_ts$Total_profit)] <- 0
+
+head(Superstore_data_pr_ts)
+```
+
+```{r}
+Superstore_data_pr_ts |>
+  #filter_index("2016-01" ~ "2017-06") |>
+  ggplot(mapping = aes(x = Order.Date, y = Total_profit)) +
+  geom_line() +
+  geom_smooth(method = 'lm', color = 'blue', se=FALSE) +
+  labs(title = " Trend (2014 - 2017) ") +
+  theme_hc()
+```
+
+-   Overall Profit is also increasing over the years, in the state of california.
+
+-   Since California is in the west of US, we ask the question -
+
+###3. Is there any region wise trend in how products are bought?  
+
+-   Hence will plot Region vs orders placed.
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Region, color = Region, fill=Region)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=after_stat(count)), vjust=-0.5) +
+  theme_minimal()+
+  labs(title =" Count of Products bought based on Region")
+```
+
+-   From the above plot can say that Western region has overall higher orders being placed than other regions.Followed by the Eastern Region. 
+
+
+### 4. Hypothesis (Average Sales in Western region is Same as Average Sales in East Region) -
+ -   From above plot, we can see that the orders placed in western and eastern region to be somewhat Higher compared to other regions. So we can put up a Hypothesis that Total Average sales in both western and eastern regions can be similar.Also, this case can be considered with the point that both regions see a increase in Tech companies. Also, from above analysis, we know that California is in the West of US, while New York the second state with highest orders is in the Eastern part of US. 
+So, We can say that similar marketing or other tactics can be implemented in both regions, it does not have any particular role in figuring average total sales for those regions separately, as they all are same.
+   
+   -   Hence, taking 2 Regions for the purpose of generating a Null Hypothesis. i.e. Western and Eastern regions. As discussed above, there are 2 reasons for picking those 2 regions - 
+        1. Technology and Tech companies are expanding in both regions (eg: California [west] and New York [east]). 
+        2. The orders from both region is comparitively higher than other regions, which can be conisdered as point to stategise in a similar manner. 
+   -   Let us assume the first Null Hypothesis to be :  Average Sales of Western Region = Average Sales of Eastern Region.
+   
+$$
+H_0: \text{Average Sale remains equal for 2 regions. (i.e Western and Eastern) within products.}  
+$$ 
+
+$$
+H_0: \text{AvgSales_West = AvgSales_East}  
+$$
+
+   -   **Alpha Level** -$\alpha$ here represents the rejection region. If our observed value falls in this area, we are safe to reject the null hypothesis, and assume the alternative.
+   -   The alpha level $\alpha$, represents the probability of making a Type I error, which is rejecting the null hypothesis when it is actually true. 
+   -   So taking the $\alpha$ value to be 0.05, so that False negative rate (i.e. Null hypothesis is true and the hypothesis is rejected) is low and Null Hypothesis becomes true for both the regions - West and East.
+    
+```{r}
+   alpha <- 0.05
+```
+    
+    
+   -   **Power Level ** (1-$\beta$) here represents the Power i.e. True Negative Rate, which is the probability of Rejecting a Null Hypothesis when it is actually False. So we would want this to happen, such that right predictions are obtained (i.e., avoiding a Type II error). Lets assume it to be 0.80. Such that we obtain an appropriate result.
+   
+```{r}
+    power <- 0.8
+```
+
+
+   - **Minimum Effect size** - It is the smallest difference in average between sales for each of the category, for which we want to detect from our test. Let us assume that to be around 100$. i.e. Minimum difference between average of sales in Western and Eastern regions.
+```{r}
+    min_effect_size <- 100
+```
+
+
+-   **Sample size calculation**: 
+    -   To determine if I have enough data to perform a Neyman-Pearson hypothesis test.
+    -   Making use of pwr libarary, to calculate the sample size. This helps in determining how many observations are needed to achieve a certain level of power to detect a specific effect size with a specified significance level.
+    
+```{r}
+   #install.packages("pwr")
+   library(pwr)
+```
+
+
+```{r}
+    # Assuming you have access to the population standard deviation
+    population_sd <-  sd(Superstore_data$Sales)
+
+    # Calculate the required sample size
+    sample_size <- pwr.t.test(d = min_effect_size / population_sd, sig.level = alpha, power = power, type = "two.sample")
+
+    # Print the required sample size
+    sample_size$n
+```
+  
+   -   From above sample size calculation, it is about 611. Since each of the region has sufficient count of data. i.e. Western region = 3203, Eastern region = 2848
+   -   So I believe I can implement Neyman-Pearson hypothesis test, to find if to accept or reject null hypothesis.
+
+-   **Neyman-Pearson Test**:
+
+    ```{r}
+    west_sales <- Superstore_data$Sales[Superstore_data$Region == "West"]
+    east_sales <- Superstore_data$Sales[Superstore_data$Region == "East"]
+
+    # Performing a two-sample t-test
+    t_test_result <- t.test(west_sales, east_sales)
+
+    # Print t-test results
+    print(t_test_result)
+    ```
+    ```{r}
+    # Interpret the results
+    if (t_test_result$p.value < alpha) {
+      cat("Reject the null hypothesis. There is a significant difference in average sales between Western and Eastern regions for the products sold.")
+    } else {
+      cat("Fail to reject the null hypothesis. There is no significant difference in average   sales between Western and Eastern regions for the products sold.")
+    }
+
+    ```
+    
+-   As per the result, We need to Accept the Null Hypothesis, which states that there is no difference between the average of sales in both regions -> west and east. If we accept the Null hypothesis then the alternate hypothesis cannot be considered as True, which is - Average sales of west is equal to Average sales of Eastern region.
+-   So all in all, we can say that Eastern and western region must be treated in a similar manner, when it comes to selling products. Whatever Marketing is influencing products in Western region must be implemented in the Eastern region too. Also, they must be considered as a single region and no separate trends need to be checked.
+
+-   This same can be looked into by checking the total sales for each region,
+
+```{r}
+superstore_regionwise_sales <- Superstore_data |> 
+                          select(Region, Sales) |>
+                         group_by(Region) |>
+                         summarise(Total_sales = sum(Sales))
+superstore_regionwise_sales
+```
+
+
+```{r}
+superstore_regionwise_sales %>%
+  ggplot(aes(x = Region, y = Total_sales, fill = Region)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Total_sales), position = position_stack(vjust = 0.5)) +
+  theme_minimal() +
+  labs(title = "Total Sales based on Region", y = "Total Sales")
+```
+
+-   Total Sales also seems to be somewhat similar with the hypothesis, that the total sales for both East and West is almost same. 
+-   Seems like irrespective of the region, there is a direct co-relation between the number of products being bought by customer and sales in that region.
+
+
+
+
+### 5. The question is about determining if segments display a specific way in how orders are placed.
+
+```{r}
+Superstore_data |>
+  ggplot(mapping = aes(x=Segment, color = Segment, fill=Segment)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=after_stat(count)), vjust=-0.5) +
+  theme_minimal()+
+  labs(title =" Count of Products bought based on Segments")
+```
+
+-   Most orders placed are from the consumer segment.
+
+###6. Hypothesis (Total sales VS each category?)
+
+```{r}
+    sales_total <- Superstore_data |> group_by(Category) |>
+                  summarise(count= n(),Total_sales = sum(Sales),
+                  .groups = 'drop') |>   arrange(desc(Total_sales))
+    tail(sales_total)
+```
+
+```{r}
+sales_total |>
+  ggplot(mapping = aes(x=Category, y= Total_sales, fill= Category )) +
+  geom_bar(stat='identity') +
+  geom_text(aes(label = Total_sales), position = position_stack(vjust = 0.5)) +
+  theme_minimal()+
+  labs(title =" Total Sales based on Category",  y = "Total Sales")
+```
+
+   -   Considering the various categories under which the products are sold and Total sales in each category, to be somewhat similar for the years 2014 - 2017. We can say that Category does not have any particular role in figuring total sales, as they all are same.
+   
+   -   Hence, taking 2 categories for the purpose of generating a Null Hypothesis. i.e. Technology and Office Supplies. The reason for picking Technology and Office Supplies are -  Technology because plenty of products are widely being used all around the world. Office supplies because each day a lot of companies are opening and growing to expand.
+   -   Let us assume the first Null Hypothesis to be :  Average Sales of Technology = Average Sales of Office Supplies.
+
+$$
+H_0: \text{Average Sale remains equal for 2 type of categories (i.e Technology and Office Supplies) within products.}  
+$$ 
+
+$$
+H_0: \text{AvgSales_tech = AvgSales_offsupplies}  
+$$
+
+   -   **Alpha Level** -$\alpha$ here represents the rejection region. If our observed value falls in this area, we are safe to reject the null hypothesis, and assume the alternative.
+   -   The alpha level $\alpha$, represents the probability of making a Type I error, which is rejecting the null hypothesis when it is actually true. 
+   -   So taking the $\alpha$ value to be 0.05, so that False negative rate (i.e. Null hypothesis is true and the hypothesis is rejected) is low and Null Hypothesis becomes true for both the categories - Tech and Office Sales.
+    
+```{r}
+   alpha <- 0.05
+```
+    
+    
+   -   **Power Level ** (1-$\beta$) here represents the Power i.e. True Negative Rate, which is the probability of Rejecting a Null Hypothesis when it is actually False. So we would want this to happen, such that right predictions are obtained (i.e., avoiding a Type II error). Lets assume it to be 0.80. Such that we obtain an appropriate result.
+   
+```{r}
+    power <- 0.8
+```
+
+
+   - **Minimum Effect size** - It is the smallest difference in average between sales for each of the category, for which we want to detect from our test. Let us assume that to be around 100$. i.e. Minimum difference between average of sales in tech and office supplies.
+```{r}
+    min_effect_size <- 100
+```
+
+
+-   **Sample size calculation**: 
+    -   To determine if I have enough data to perform a Neyman-Pearson hypothesis test.
+    -   Making use of pwr libarary, to calculate the sample size. This helps in determining how many observations are needed to achieve a certain level of power to detect a specific effect size with a specified significance level.
+    
+```{r}
+   #install.packages("pwr")
+   library(pwr)
+```
+
+
+```{r}
+    # Assuming you have access to the population standard deviation
+    population_sd <-  sd(Superstore_data$Sales)
+
+    # Calculate the required sample size
+    sample_size <- pwr.t.test(d = min_effect_size / population_sd, sig.level = alpha, power = power, type = "two.sample")
+
+    # Print the required sample size
+    sample_size$n
+```
+  
+   -   From above sample size calculation, it is about 611. Since each of the categories have sufficient count of data. i.e. Tech = 1847, Office Supplies = 6026
+   -   So I believe I can implement Neyman-Pearson hypothesis test, to find if to accept or reject null hypothesis.
+
+-   **Neyman-Pearson Test**:
+
+    ```{r}
+    tech_sales <- Superstore_data$Sales[Superstore_data$Category == "Technology"]
+    office_sales <- Superstore_data$Sales[Superstore_data$Category == "Office Supplies"]
+
+    # Performing a two-sample t-test
+    t_test_result <- t.test(tech_sales, office_sales)
+
+    # Print t-test results
+    print(t_test_result)
+    ```
+    ```{r}
+    # Interpret the results
+    if (t_test_result$p.value < alpha) {
+      cat("Reject the null hypothesis. There is a significant difference in average sales between Technology and Office products.")
+    } else {
+      cat("Fail to reject the null hypothesis. There is no significant difference in average   sales between Technology and Office products.")
+    }
+
+    ```
+    
+-   As per the result, We need to reject the Null Hypothesis as there is a large difference between the average of sales in both category -> Technology and Office Supplies. If we reject the Null hypothesis then the alternate hypothesis can be considered as True, which is - Average sales of tech is not equal to Average sales of Office Supplies.
+-   As per the alternate Hypothesis, We cant determine if the average sales done on both the categories will remain 
+
+
+
+---
+# Conclusion -
+
+-   For improving sales in California, since the sector is primarily focused on technology, we may assume that the company is not currently promoting its products, because of the necessity.  If this is the case, they could want to think about doing so in the future to draw in clients who are prepared to purchase office supplies.
+-   And if their current marketing strategy is bringing in sales in the California region, they ought to stick with it over time. 
+In addition, since there aren't any or very little discounts offered in California, they can consider using other tactics to entice customers to purchase their goods, such as providing discounts on infrequent days when sales aren't particularly strong. This ought to additionally contribute to their overall sales growth.
+- Also, we could see that for the state of california the trend of total sales is increasing slowly each year. so the business can keep doing the current way of marketing. As that doesn't have bad impact on sales. Also, profit was gained gradually too over the years
+-    Based on the acceptance of the Null Hypothesis that there is no significant difference between the average sales in the Western and Eastern regions, it can be inferred that both regions exhibit similar sales patterns. This implies that marketing strategies and product influences that have proven effective in the Western region can be implemented with confidence in the Eastern region as well. Treating both regions as a unified entity and disregarding the need to explore separate trends supports the notion that there is a harmonious and comparable market environment across the West and East. This conclusion encourages a cohesive approach to business strategies, suggesting that efforts invested in one region can be mirrored in the other, contributing to a streamlined and efficient overall marketing and sales approach.
+-   Also, with the help of statistics we could prove that every category has a significant role in obtaining total sales. we cannot generalize them to say that the average of each category is same. This was proved using Hypothesis Test. Hence business must take utmost care when strategizing on how to sell those products. Like from California instance above, we saw office supplies was crucial in that area, but since those are tech-based companies, technology also plays a vital role. So marketing each must be done by looking into regions and their need. Marketing for each category should be done.

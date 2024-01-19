@@ -1,0 +1,224 @@
+---
+title: "Data Dive - Time_based_Data"
+author: "Amritha Prakash"
+date: "2023-11-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ASSIGNMENT 12
+
+### Task(s)
+
+-   Select a column of your data that encodes time (e.g., "date", "timestamp", "year", etc.). Convert this into a Date in R.
+    -   Note, you may need to use some combination of as.Date, or to_datetime. And, you may even need to paste year, month, day, hour, etc. together using paste (even if you need to make up a month, like "__/01/01").
+    -   If you do not have a time-based column of data: find a Wikipedia page that is related to your dataset. Then, extract a time series of page views for that page using the wikipedia page views websiteLinks to an external site. or the R package used in this week's lab.
+        If you choose this option, find ways to tie your results from the below analysis into what you're seeing with your own data!
+-   Choose a column of data to analyze over time. This should be a "response-like" variable that is of particular interest.
+-   Create a tsibble object of just the date and response variable. Then, plot your data over time. Consider different windows of time.
+    -   What stands out immediately?
+-   Use linear regression to detect any upwards or downwards trends.
+    -   Do you need to subset the data for multiple trends?
+    -   How strong are these trends?
+-   Use smoothing to detect at least one season in your data, and interpret your results.
+    -   Can you illustrate the seasonality using ACF or PACF?
+
+------------------------------------------------------------------------
+
+### **Load the libraries**
+
+```{r, echo=FALSE}
+# Load tidyverse
+library(dplyr)
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(xts)
+library(tsibble)
+library(tibble)
+```
+
+### **Load the Superstore Data**
+
+```{r}
+Superstore_data=read.csv("SampleSuperstore_final.csv")
+head(Superstore_data)
+
+```
+
+
+
+```{r}
+library(wikipediatrend)
+
+```
+
+### Retrieving Data for Time Series Analysis
+
+-   Since I do not have a data set with time values within it, I am picking wikipedia page views dataset in order to work on Time Series Analysis .
+-   I am planning to take up Exercise topic , to analyse how far people were concious about exercising back in the time line from 2007-12-10 to 2015-12-31.
+-   Following code contains is extracting data for same.
+
+
+```{r}
+exercise_pageviews <- wpd_get_exact(page="Exercise", from="2006-12-01", to="2015-12-31", lang="en", warn=TRUE)
+```
+
+
+```{r}
+tail(exercise_pageviews)
+```
+
+-   Since the data is extracted from wikipedia, the date when the Exercise page was viewed is already in Date format "%y-%m-%d".Hence, I believe we dont need to select a column that encodes time (e.g., "date", "timestamp", "year", etc.)and Convert into a Date in R.
+-   In order to further choose a column of data to analyze over time, considering it to be "response-like". We can take it as view.
+Hence **Response-like variable = VIEW**
+
+# Create Tsibble
+-   Further creating a tsibble object to pick the date and response variable, here view in our case. This can be used to plot the data over time. 
+```{r}
+ex_pgViews <- select(exercise_pageviews, date, views)
+ex_pgViewsTS <- as_tsibble(ex_pgViews, index = date)
+head(ex_pgViewsTS)
+```
+
+### Plotting -
+-   Full Plotting -
+```{r}
+ex_pgViewsTS %>%
+  ggplot() +
+  geom_line(mapping = aes(x = date, y = views)) +
+  labs(title = "Exercise Page Views on Wikipedia from 2008-2016") +  
+  theme_bw() + 
+  scale_x_date(breaks = "1 year", labels = \(x) year(x))
+```
+
+-   Here from the above plot can see drastic reduction of pageview/search for "exercise" over time within the range 2008 - 2016 . But overall the search about exercise is reducing. These dips maybe associated with the increase in how various technological advances happened over the years and maybe people have not been that health conscious.
+
+-   Following is the plot when tech was just evolving i.e. between 2008 - 2011.
+
+```{r}
+  ex_pgViewsTS %>%
+  filter(date < as.Date('2011/01/01')) |>
+  ggplot() +
+  geom_line(mapping = aes(x = date, y = views)) +
+  ylim(0,2500) +
+  labs(title = ' 2008-2011',
+       subtitle = 'Pre Tech evolution',
+       x = 'Years',
+       y = 'Total views/curiosity about Exercise') +  
+  theme_bw() + 
+  scale_x_date(breaks = "1 year", labels = \(x) year(x))
+  
+
+```
+
+This graph plots the window of time before Technology overtook and exercise was important and people took time to understand it better.
+
+
+-   Following is the plot when tech evolved better i.e. between 2011 - 2016.
+
+```{r}
+  ex_pgViewsTS %>%
+  filter(date >= as.Date('2011/01/01')) |>
+  ggplot() +
+  geom_line(mapping = aes(x = date, y = views)) +
+  ylim(0,2500) +
+  labs(title = ' 2011-2016',
+       subtitle = 'Time where "Exercise" was known post Technology evolution',
+       x = 'Years',
+       y = 'Total views/curiosity about Exercise') +  
+  theme_bw() + 
+  scale_x_date(breaks = "1 year", labels = \(x) year(x))
+  
+
+```
+
+This graph plots the window of time post Technology overtook and exercise was already known to most people and hence maybe they stoped searching for it.
+
+### Trends -
+
+```{r}
+ex_pgViewsTS %>%
+  ggplot(mapping = aes(x = date, y = views)) +
+  geom_line() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Exercise Page Views on Wikipedia from 2008-2016",
+       x = 'Season',
+       y = 'Total 3 Point Attempts')
+```
+
+-   As we could already tell visually there is a down trend which is linear exists. From 2007 - 2010, this trend looks pretty consistent over time, however, from 2010-2016 the drop appears to be more rapid than the previous years. Like it is seen to be reducing by certain amount each phase of the years to come.
+
+-   Using Linear regression it is so easy to detect the downwards trends over the years.
+    -   Do you need to subset the data for multiple trends?
+        > We can divide the data set into 2 parts i.e. 2007 to 2009 mid, where we can see certain constant check on exercise page over wikipedia, but after a while that same page (2010 to 2016), can see it go low! 
+        
+        
+    ```{r}
+    pre2010 <- ex_pgViewsTS %>%
+          filter(date < as.Date('2010/01/01'))
+    post2010 <- ex_pgViewsTS %>%
+  filter(date >= as.Date('2010/01/01'))
+
+ggplot() +
+  geom_line(mapping = aes(x = pre2010$date, y = pre2010$views)) +
+  geom_smooth(mapping = aes(x = pre2010$date, y = pre2010$views),method = "lm", se = FALSE) +
+  geom_line(mapping = aes(x = post2010$date, y = post2010$views)) +
+  geom_smooth(mapping = aes(x = post2010$date, y = post2010$views),method = "lm", se = FALSE) +
+  labs(title = "Wikipedia page view for time period 2008 - 2016",
+       x = 'years',
+       y = 'Views/Curiosity for Exercise ')
+    ```
+    -   How strong are these trends?
+        By separating the trends at the 2010, we can see that there may be different levels of trend for pre 2010 and 2010-2016. This is not extremely shocking because it is known by people, what the Term " exercise" is. Like drastic drop is seen from 2007 to 2010, while it is seen to be slow or  have been reduced little by little when we reached 2016 from 2010.
+        
+        
+### Smoothing
+### LO(W)ESS
+
+```{r}
+ex_pgViewsTS %>%
+  ggplot(mapping = aes(x= date, y = views)) +
+  geom_point(size = 1, shape = 'o') +
+  geom_smooth(span = 0.4, se = FALSE) +
+  labs(title = "Exercise page View by the year",
+       subtitle = "loess smoothing - span = 0.4",
+       x = 'years',
+       y = 'Total views')
+```
+
+
+-   With LOcally Weighted Scatterplot Smoothing method, we can visualize the general trend of noisy data.we have defined the window of data.The middle point in this window holds the highest weight, and the weights decrease for data points further away from the middle. From the plot we can determine the same for the page views over the years.The resulting curve models the slopes for each of those lines from within the window.
+
+
+### Looking at Seasons
+-   First to determine potential seasons, a smooth curve for quarterly page view averages on the “Exercise” Wikipedia page will be plotted:
+```{r}
+ex_pgViewsTS|>
+  index_by(year = floor_date(date, 'quarter')) |>
+  summarise(avg_views= mean(views, na.rm = TRUE)) |>
+  ggplot(mapping = aes(x = year, y = avg_views)) + geom_line(color="blue",size=1.5) +geom_smooth(span = 0.3, color = 'red', se=FALSE, size=1.5) +labs(title = 'Average Number of "Exercise" Wikipedia Page Views Over Time', subtitle = "by quarter year",y="Average Views",x="Year") + scale_x_date(breaks = "1 year", labels = \(x) year(x)) + theme_bw()
+```
+
+-   From above plot not much with respect to season can be figured out over the years.
+-   Like from 2008 on, the page views seem to not have particular season on page view for exercise, i.e. it increased and dropped by 2010.Further from year 2010 the page view increased slightly and would go even lower than that by the end of the year. But for 2011 onwards the trend goes up in the start and down the later part. This entire flow uptill 2016, is too evident.
+
+
+### Auto Correlation
+
+-   If a smooth curve is not able to readily depict small-scale seasons, we can examine the correlation between page visits over time to see if any exist. In this instance, a graph has been made where a lag of 1 corresponds to one week passing:
+```{r}
+acf(ex_pgViewsTS, ci = 0.95, na.action = na.exclude,main='ACF for "Exercise" Wikipedia Page Views',xlab="Lag (Weekly)")
+```
+
+
+-   From this, we can see that the pattern repeats every 6 lines, which indicates weekly auto-correction since the default lag was used. This shows that there may also be a weekly seasonality to “Exercise” Wikipedia page views.
+
+
+---
+From the analysis of the “Exercise” Wikipedia page views between January 2007 and December 2017, we could see 2 clear trends emerge. Between January 2007 and December 2010, there was a sharp decreasing trend, and between Jan 2010 and December 2017, there was a slow decreasing trend in the number of page views. It is unclear why the sharp decreasing trend switches to a mild decreasing trend during the course from 2010 to 2017.
+
+Furthermore, the page views data seems to exhibit both weekly and annual seasonality; that is, page views fluctuate in a comparable way throughout the week. Some broad weekly trends in page views are to be expected, as the weekly seasonality may be explained by people's tendency to spend more time on the weekends and less time during the week searching the internet for information. The yearly seasonality may be explained by the fact that, as a result of their New Year's Resolutions, which may include starting an exercise regimen, people tend to be more health-conscious at the start of the year.

@@ -1,0 +1,713 @@
+# Linear Regression
+
+In this lab, we cover the following hypothesis tests:
+
+-   ANOVA
+-   Linear Regression
+-   Simpson's Paradox (demo)
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(AmesHousing)
+library(boot)
+library(broom)
+library(lindia)
+```
+
+## ANOVA
+
+It isn't always that hypothesis testing is between two groups. Sometimes, we're actually interested in comparing multiple groups. In this case, we need to construct a hypothesis test which maintains neutrality, but whose alternative implies a different group among many. In these cases, given some parameter $\theta$ across $k$ different groups, our null hypothesis is:
+
+$$
+H_0 : \theta_1 = \theta_2 = \cdots = \theta_k
+$$
+
+In this way, the alternative would be that there exists *at least one* group $i$ where $\theta_i$ is different from there rest.
+
+For example, referring to the [Ames Housing Dataset](http://ww2.amstat.org/publications/jse/v19n3/decock.pdf) (and its [documentation](https://jse.amstat.org/v19n3/decock/DataDocumentation.txt)), suppose we're interested in the house price across different Building Types.
+
+```{r}
+# make a simpler name for (and a copy of) the Ames data
+ames <- make_ames()
+ames <- ames |> rename_with(tolower)
+view(ames)
+
+```
+
+```{r}
+ames |>
+  ggplot() +
+  geom_boxplot(mapping = aes(y = sale_price, x = bldg_type)) +
+  scale_y_log10(labels = \(x) paste('$', x / 1000, 'K')) +
+  annotation_logticks(sides = 'l') +
+  labs(x = "Building Type",
+       y = "Log Sales Price (in $1000s)") +
+  theme_minimal()
+```
+
+We can see that some of these typically have a slightly higher sales price than others, but we want to know if the differences are large enough to significanlty challenge our hypothesis that they're actually all basically the same. So, in this case, our hypothesis test is
+
+$$
+H_0 : \text{average house price is equal across all Building Types}
+$$
+
+### Analysis of Variance
+
+To help us understand how each of these groups differ from one another, the Analysis of Variance method measures three different ways that the data points **vary**:
+
+-   Group Variance: Group averages' deviation from the global average
+    -   E.g., in our example, we have five different "group averages"
+-   Error Variance: Within-group deviations from their group average
+    -   I.e., the average amount that data points vary from their group average
+-   Total Variance: The amount to which all data points vary from the global average
+    -   This is just the variance of the numerical column of data.
+
+$$
+\begin{align*}
+\text{MSG} &= \frac{1}{\text{df}_g}\text{SSG} 
+= \frac{1}{k - 1}\sum_{i = 1}^k n_i(\bar{x}_i - \bar{x})^2 \\
+\text{MSE} &= \frac{1}{\text{df}_e}\text{SSE} 
+= \frac{1}{n - k}\sum_{i = 1}^k (n_i - 1)s_i^2 \\
+\text{MST} &= \frac{1}{\text{df}_t}\text{SST} 
+= \frac{1}{n - 1}\sum_{i = 1}^n (x_i - \bar{x})^2
+\end{align*}
+$$
+
+You might notice that each of these are just different measures of variance:
+
+-   $MSG$ is the Mean Squared **Group** variance. It is the variance *between* the $k$ groups (one for each group), weighted by the size of each group.
+-   $MSE$ is the Mean Squared **Error** variance, and it is the (typical) variance *within* each group, but with an adjustment calculation to the degrees of freedom (replacing the $n_i - 1$ for each group with $n-k$.
+-   $MST$ is the Mean Squared **Total** variance, and it is just the typical variance of all the values in the column of data.
+-   Similarly, the $SS\_$ is the (weighted) sum of squared differences for each measure of variance, and it can be shown that $\text{SST = SSE + SSG}$.
+-   The $\text{df}_j$ represents the Degrees of Freedom for item $j$. This is the number of data points being used in the calculation (e.g., $n$ if we're averaging $n$ things), minus the number of parameter values that are using in the calculation which *depend* on each of those data points (e.g., 1 for $\text{MSG}$ because we're using the global mean $\bar{x}$ in the calculation).
+
+### Assumptions
+
+At this point, you might notice a few assumptions that must hold before we can continue:
+
+1.  **Independence**. Each data point must be independent of every other data point.
+2.  **Normality.** The distribution of within each group must be roughly normal. (E.g., imagine making a histogram for each group.)
+3.  **Homoscedasticity** **(Constant Variance)**. The variance of data within groups remains consistent for every group. (I.e., no group has a significantly higher standard deviation than any other group.)
+
+*Of course, these assumptions are very strong and constricting!* But, in most cases, if they're "close enough", the test will typically hold just fine --- you'll just need to balance the risks as needed.
+
+### EXERCICE
+
+For the hypothesis test we've formed above, determine if our data set meets all of these assumptions. If not, explain why, or how far off they are.
+
+```{r}
+ames_check <-ames|> group_by(bldg_type=ames$bldg_type, ames$sale_price) 
+#view(ames_check) 
+
+ames_table <- data.frame(ames$bldg_type,ames$sale_price)
+ames_table
+
+var_each_grp <- ames |>  group_by(ames$bldg_type)
+  summarise(mean_price = mean(ames$sale_price),
+            sd_price = sd(ames$sale_price))
+  var_each_grp
+  
+# one of the groups having variance
+```
+
+```{r}
+ames|>
+geom_histogram(mapping = aes(x=sales_price),color='white')
+```
+
+### F-Test
+
+Remember that every hypothesis test requires a sampling distribution, considering all possible ways a dataset could have been sampled from the population. This way, we can compare our data from other theoretical possibilities. In our case, we are looking at evaluating our variances, above. In particular, since $\text{SST = SSE + SSG}$, we can just concern ourselves with $\text{SSE}$ and $\text{SSG}$.
+
+The [**F Distribution**](https://en.wikipedia.org/wiki/F-distribution) measures models the ratio of two random variables that follow a chi-squared distribution, proportional to their degrees of freedom. In our case, both $SSG$ and $SSE$ are modeled by a $\chi^2$ distribution (recall the squared differences between "observed" and "expected"), and we've already divided out their degrees of freedom when calculating the $\text{MSG}$ and $\text{MSE}$. So, the test statistic for an ANOVA is:
+
+$$
+F^* = \frac{\text{SSG}/df_g}{\text{SSE}/df_e}
+= \frac{MSG}{MSE} = \frac{\text{variance between groups}}{\text{variance within groups}} 
+$$
+
+```{r}
+n <- nrow(ames)
+k <- n_distinct(ames$bldg_type)
+
+ggplot() +
+  geom_function(xlim = c(0, 10), 
+                fun = \(x) df(x, k - 1, n - k)) +
+  geom_vline(xintercept = 1, color = 'orange') +
+  labs(title = 'F Distribution for Ames Building Types',
+       x = "F Values",
+       y = "Probability Density") +
+  theme_hc()
+```
+
+When $F^* \approx 1$, the variance *between* groups is roughly the same as the variance *within* groups, and there is likely no relationship between the groups and the numerical value. If $F^* < 1$, the numeric value is unlikely to change between groups. And, if $F^* > 1$, especially if it's large, then there is evidence that the means between the groups are not all the same.
+
+### ANOVA Summary
+
+An ANOVA test models a numerical value (i.e., the Sales Price) using the effects of some categorical factor (i.e., Building Type). We symbolically represent an ANOVA *model* in R using the formula `response ~ factor`. In this case, we only have one factor, so our formula is `sale_price ~ bldg_type`, and we have a **one-way** ANOVA. If we wanted to do the same thing but for two factors, we'd have a **two-way** ANOVA, and our formula would be `response ~ factor1 * factor2`. In our case, we have the following test:
+
+```{r}
+m <- aov(sale_price ~ bldg_type, data = ames)
+summary(m)
+```
+
+Given such a small p-value, and such a large dataset, we can conclude that it is *very* unlikely the means are all equal, and at least one is different from the rest.
+
+To determine *which one* is most unlikely to be the same as the rest, we can use multiple pairwise t-tests to compare each group (rows) to each other group (columns).
+
+```{r}
+pairwise.t.test(ames$sale_price, ames$bldg_type, p.adjust.method = "bonferroni")
+```
+
+It looks like it is very unlikely that `OneFam` is the same as the others, but it might have the same price as the `TwnhsE` group. Similarly, the `TwnhsE` group is probably not the same price as the rest of the groups.
+
+Notice that we are running multiple t-tests here. With each test, individual p-values must decrease proportionally to the number of tests being run (this is similar to p-hacking/peaking), since we're still using the same sample of data. To correct for this deflation, the [**Bonferroni Correction**](https://en.wikipedia.org/wiki/Bonferroni_correction) multiplies each p-value by the number of tests being run.
+
+We can see this more clearly in ggplot using the same `boot_ci` function (using [boot.ci](https://www.rdocumentation.org/packages/boot/versions/1.3-28.1/topics/boot.ci)) from a previous week.
+
+```{r}
+# we use a "_" so we don't overwrite the original function
+boot_ci <- function (v, func = median, conf = 0.95, n_iter = 100) {
+  # the function we want to run on each iteration i
+  boot_func <- \(x, i) func(x[i])
+  
+  # the boot instance, running the function on each iteration
+  b <- boot(v, boot_func, R = n_iter)
+  b <- boot.ci(b, conf = conf, type = "perc")
+  
+  # return just the lower and upper values
+  return(c("lower" = b$percent[4],
+           "upper" = b$percent[5]))
+}
+```
+
+```{r}
+df_ci <- ames |>
+  group_by(bldg_type) |>
+  summarise(ci_lower = boot_ci(sale_price, mean)['lower'],
+            mean_price = mean(sale_price),
+            ci_upper = boot_ci(sale_price, mean)['upper'])
+
+df_ci
+```
+
+```{r}
+df_ci |>
+  ggplot() +
+  geom_errorbarh(mapping = aes(y = bldg_type, 
+                               xmin=ci_lower, xmax=ci_upper,
+                               color = '95% C.I.'), height = 0.5) +
+  geom_point(mapping = aes(x = mean_price, y = bldg_type,
+                           color = 'Group Mean'),
+             shape = '|',
+             size = 5) +
+  scale_color_manual(values=c('black', 'orange')) +
+  theme_minimal() +
+  labs(title = "Sales Price By Building Type",
+       x = "Sales Price (in $)",
+       y = "Building Type",
+       color = '')
+```
+
+A few **caveats:**
+
+-   It is tempting to just look at confidence intervals, and skip the ANOVA test altogether. However, it's a much better practice to test whether there is a difference at all before looking at supposed differences themselves.
+-   You'll notice that some of these intervals are asymmetric. This is a consequence of the skew of the individual distributions. *Take a look at individual histograms or quantiles to prove this to yourself.*
+
+## Linear Regression
+
+### Introduction
+
+To help us understand Linear Regression, we'll use one of the data sets from [**Anscombe's Quartet**](https://en.wikipedia.org/wiki/Anscombe%27s_quartet).
+
+```{r}
+anscombe |>
+  ggplot(mapping = aes(x = x1, y = y1)) +
+  geom_point(size = 2, color = 'darkblue') +
+  theme_minimal()
+```
+
+Let's assume that these data represent 10 empirical observations. These observations each have associated with them some attribute $x$ (e.g., neighborhood average house size), and an outcome of particular interest $y$ (e.g., neighborhood median household income). There *seems* to be a linear relationship between these $y$ vs. $x$, i.e., as x increases, y tends to increase by a fixed amount. So, we ask ourselves:
+
+**Can we sufficiently model** $y$ **using only a constant linear transformation of** $x$ **(a line)?**
+
+Suppose we stick with this idea that our data can be modeled linearly, and let's propose a line `lm` (or "linear model") that "fits" this data.
+
+**ASSUMPTION 1: VARIABLE** $x$ **IS LINEARLY CORRELATED WITH RESPONSE** $y$**.**
+
+```{r}
+anscombe |>
+  ggplot(mapping = aes(x = x1, y = y1)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = 'darkblue') + 
+  theme_minimal()
+```
+
+We see the line crosses $(6,6)$ and $(10,8)$. So, we can use these two points $(x_1, y_1)$, $(x_2, y_2)$ to get the slope $m$, and derive the equation for the line using
+
+$$
+\begin{align}
+    y - y_1 &= m\cdot(x - x_1) \newline
+    y - y_1 &= \left(\frac{y_2 - y_1}{x_2 - x_1}\right) \cdot (x - x_1) \newline
+    y - 6 &= \left(\frac{8 - 6}{10 - 6}\right) \cdot (x - 6) \newline
+    y - 6 &= \frac{2}{4} x - \frac{2}{4} \cdot 6 \newline
+    y &= \frac{1}{2} x + 3 \newline
+\end{align}
+$$
+
+**Interpretation: This slope** $m = 0.5$ means there is a change in $y$ of .5 units for every unit (1) change in $x$. And, the y-intercept $b$ indicates when $x$ is zero, $y$ is 3.
+
+Now, before we move on to the next section, think about these questions:
+
+1.  **Is this line a good fit for our data?**
+2.  **Is this line a good *model* for** $y$?
+
+### Single Variable
+
+Let's investigate those questions as to whether this is a "good fit" by quantifying the differences between our model and the actual values in the data which inform the model.
+
+```{r}
+# the line estimated above
+lm_ <- \(x) (1 / 2) * x + 3
+
+anscombe |>
+  ggplot(mapping = aes(x = x1, y = y1)) +
+  geom_point(size = 2) +
+  geom_segment(mapping = aes(xend = x1, y = y1, yend = lm_(x1), 
+                             color = 'error'), linewidth = 1) +
+  geom_smooth(method = "lm", se = FALSE, color = 'red', linewidth = 0.5) + 
+  scale_color_manual(values = c('darkblue')) +
+  labs(color = '') +
+  theme_minimal()
+```
+
+On the figure, the dots are the points in our dataset and the red line is what we want to evaluate. Let's define a few terms based on this image:
+
+-   $x_i$ : the $i$th value in the data for the explanatory variable $x$
+-   $y_i$ : the $i$th value in the data for the response variable $y$
+-   $\hat{y}_i$ : the predicted response value from the model for $x_i$
+-   $e_i$ : the error for the $i$th prediction, or the "residual" distance from each point $(x_i, y_i)$ to the line
+-   $\hat{\beta}$ : a *vector* of *estimated* parameters that define the model
+    -   $\hat{\beta}_0 = b = \text{y-intercept}$
+    -   $\hat{\beta}_1 = m = \text{slope, for }x$
+    -   We assume there exists a "true" linear relationship with parameters $\beta$ (no hat)
+-   So, $\hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1x_i = y_i + e_i$.
+
+"Ordinary Least Squares" (OLS) is an approach (used by ggplot, for instance) for fitting a model/line by finding values for $\hat{\beta}$ that minimizes the *sum of squared errors*. There are a few reasons it seeks to minimize this metric (e.g., it works nicely with derivatives and linear algebra, it creates a convex optimization problem, etc.), but it suffices to say that this is typically the metric of choice. That means OLS is taking each error, squaring it, and then trying to minimize the sum of those areas by changing $\hat{\beta}$ values. What does that look like?
+
+```{r}
+# try adjusting these
+beta_0 <- 3
+beta_1 <- 1/2
+
+lm_ <- \(x) beta_1 * x + beta_0
+
+anscombe |>
+  ggplot() +
+  geom_point(mapping = aes(x = x1, y = y1), size = 2) +
+  geom_smooth(mapping = aes(x = x1, y = y1), method = "lm", se = FALSE, color = 'red', linewidth = 0.5) + 
+  geom_rect(mapping = aes(xmin = x1, 
+                          xmax = x1 + abs(y1 - lm_(x1)),
+                          ymin = lm_(x1), 
+                          ymax = y1), 
+            fill = NA, color = 'darkblue') +
+  labs(color = '') +
+  theme_minimal()
+```
+
+*Think about how sensitive this scheme is to outliers, especially when they are far off to the left or right while also being far above or below the mean.*
+
+So, the goal of OLS is to minimize the Sum of Squared Errors (SSE) Cost Function:
+
+$$
+\text{SSE} = \sum _{i=1}^n \left(y_i - \hat{y}_i\right)^2
+= \sum _{i=1}^n \left(y_i - (\hat{\beta}_0 + \hat{\beta}_1x_i)\right)^2
+$$
+
+(... where the $x_i$ and $y_i$ values are known, and $\hat{\beta}$ values are unknown)
+
+> *Notice, this "SSE" is exactly the same as the one we encountered in the ANOVA test, so it will make sense when we see the F-Test used in evaluating this model ...*
+
+It is subtle, but notice here that we are treating all errors as equally detrimental to the model. That is, no predicted value should have a higher expected error than any other predicted value.
+
+**ASSUMPTION 2: ERRORS HAVE CONSTANT VARIANCE ACROSS ALL PREDICTIONS**
+
+Similarly, if the error of one observation were *conditional* or *dependent* on the error of another observation, then our cost function is biased, since it doesn't take into account this dependency. *Note: we will see later that in the case of time series, these dependencies are captured in a slightly different cost function.*
+
+**ASSUMPTION 3: OBSERVATIONS ARE INDEPENDENT** **AND UNCORRELATED**
+
+We can run linear regression models using the formula syntax (`~`), and `lm`:
+
+```{r}
+model <- lm(y1 ~ x1, anscombe)
+model$coefficients
+```
+
+In other words:
+
+-   If $x_1 = 0$, then the *expected value* for $y_1$ is $\hat{\beta}_0 = 3$.
+-   For every unit increase of $x_1$, *on average*, $y_1$ will increase by about $0.5$.
+
+### Multiple Variables
+
+It's very rare that you'll want to model a response variable using only a single explanatory variable. In the case where multiple variables are used to model the response, we want the relationship between *all* variables and the response to remain linear.
+
+As an example, we'll return to a subset of the Ames housing dataset (single family, one story homes built after 2000), and we'll create a new column that "binarizes" the `overall_qual` column into "great" or "not great".
+
+```{r}
+ames_basic <- ames |>
+  filter(bldg_type == "OneFam",
+         house_style == "One_Story",
+         year_built >= 2000) |>
+  mutate(great_qual = ifelse(overall_qual %in%
+           c("Very_Excellent", "Excellent", "Very_Good"),
+           1, 0))
+
+ames_basic |>
+  group_by(great_qual) |>
+  summarize(num = n())
+```
+
+Suppose we're interested in modeling the housing price using the `great_qual` column as well as the `first_flr_sf` (first floor sq. ft.). We are going to want to draw the same kinds of conclusions above about how the price changes with either of these variables. So, in the same way that we need both to maintain a linear relationship with the `sale_price`, if one variable is held constant, we need the other to maintain a linear relationship, and vice versa.
+
+```{r}
+# to plot facet averages
+ames_grouped <-
+  ames_basic |>
+  group_by(great_qual) |>
+  summarise(mean_price = mean(sale_price))
+
+ames_basic |>
+  ggplot() +
+  facet_wrap(vars(great_qual), labeller = label_both) +
+  geom_point(mapping = aes(x = first_flr_sf, y = sale_price)) +
+  geom_hline(data = ames_grouped,
+             mapping = aes(yintercept = mean_price),
+             color = 'darkorange', linetype = 'dashed') +
+  scale_y_continuous(labels = \(x) paste("$", x / 1000, "K")) +
+  labs(title = "Sales Price by 1st Floor Sq Ft",
+       subtitle = "Faceted by the overall quality of the house",
+       x = "1st Floor Sq Ft", y = "Sales Price") +
+  theme_minimal()
+```
+
+So here, we adjust our model by introducing a new variable which (in this case) has a binary coefficient:
+
+$$
+\hat{y} = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2
+$$
+
+```{r}
+model <- lm(sale_price ~ first_flr_sf + great_qual, ames_basic)
+model$coefficients
+```
+
+We can interpret our coefficients thus:
+
+-   (non-realistic) If there is no first floor sq. feet, and the quality is not good, the expected sales price is roughly \$7K.
+-   **If the (binary) home quality remains as it is**, and we add a single unit of first floor square footage, then we can expect the `sale_price` to increase by about \$140.
+-   **If the first floor square footage remains as it is**, and we go from not great to great quality, then we can expect the `sale_price` to increase by about \$59K.
+    -   *Note: The fact that this is not indicated by the average lines in the plot above tells us that there is a significant factor in the data that is not represented in the model ...*
+
+In general, we assume that there is a latent (thereby unknown) linear relationship between random variables $X_1, X_2, \cdots, X_k$ and a response random variable $Y$ such that:$$
+Y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \cdots + \beta_kX_k + \varepsilon
+$$ where $\varepsilon$ is the error that comes with nature itself, *normally distributed* about 0. In other words, $Y$ changes linearly with random variables $X$, and the error between the line formed and the actual values are consistently centered at zero for all $Y$ values. **In other words,** $Y$ ***regresses*** **toward a central mean value defined by a line.**
+
+### Interaction Terms
+
+Sometimes, we have a relationship between two variables such that the line formed between one and the response changes based on the other.
+
+```{r}
+ames_basic |>
+  ggplot(mapping = aes(x = year_remod_add, y = sale_price,
+                       color = factor(great_qual))) +
+  geom_jitter(height = 0, width = 0.1, shape = 'o', size = 3) +
+  geom_smooth(method = 'lm', se = FALSE, linewidth = 0.5) +
+  scale_y_continuous(labels = \(x) paste("$", x / 1000, "K")) +
+  scale_color_brewer(palette = 'Dark2') +
+  labs(title = "Sales Price by Year Remodeled",
+       subtitle = "Colored by the overall quality of the house",
+       x = "Year Remodeled (x-jittered)", y = "Sales Price",
+       color = 'Great Quality?') +
+  theme_hc()
+```
+
+Here, we can see that when the quality of the house is not great, the Year Remodeled does not really affect the Sales price much. But, when it is great, an increase in Year Remodeled has a slightly positive effect on Sales Price. We call this as an **interaction**, and it's represented in the model by multiplying the two features together, and use `:` to indicate this in the R model definition.
+
+$$
+\hat{y} = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 + \hat{\beta}_3x_1x_2
+$$
+
+```{r}
+# include all variables and their interaction
+model <- lm(sale_price ~ year_remod_add + great_qual 
+            + year_remod_add:great_qual, ames_basic)
+
+# to view more coefficients a bit easier
+tidy(model) |>
+  select(term, estimate) |>
+  mutate(estimate = round(estimate, 1))
+```
+
+For example, if the quality is not great $x_2 = 0$, then we have
+
+$$
+\hat{y} = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2 \cdot 0 + \hat{\beta}_3x_1\cdot 0
+$$
+
+And we only need to worry about the fact that a house remodeled a year more recent will tend to have a sales price of about \$500 more. On the other hand, if the quality is great $x_2 = 1$, then we have
+
+$$
+\hat{y} = \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2 + \hat{\beta}_3x_1
+= \hat{\beta}_0 + \hat{\beta}_2 + (\hat{\beta}_1 + \hat{\beta}_3)x_1
+$$
+
+And a house remodeled a year more recent (in this case) will tend to be \$(513.3 + \$5087.5 = \$5600.8) more.
+
+### EXERCISE
+
+Develop another model which uses a different combination of variables and includes an interaction term. Run the model, look at the coefficients, and interpret your results.
+
+```{r}
+print("your code here")
+```
+
+### (Multi)collinearity
+
+Let's consider the features `first_flr_sf` ($x_1$) and `lot_area` ($x_2$). Again, if we're interested in modeling the sales price for a house, then these are *both* explanatory variables.
+
+```{r}
+ames_basic |>
+  filter(lot_area < 30000) |>
+  ggplot(mapping = aes(x = first_flr_sf, y = lot_area)) +
+  geom_point() +
+  theme_classic()
+```
+
+There's a linear relationship between these two, so we could write a sort of "sub-model" as:
+
+$$
+x_2 = m x_1 + b
+$$
+
+Now, suppose we were to build a model that contained both of them:
+
+$$
+\begin{align*}
+\hat{y} &= \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2x_2 \\
+&= \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2(mx_1 + b) \\
+&= \hat{\beta}_0 + \hat{\beta}_1x_1 + \hat{\beta}_2mx_1 + \hat{\beta}_2b\\
+\to &= (\hat{\beta}_0 + \hat{\beta}_2b) + (\hat{\beta}_1 + \hat{\beta}_2m)x_1
+\end{align*}
+$$
+
+So *if* we were to interpret $\hat{\beta}_1$ (in the "original" model output) as the amount $y$ increases with each unit change in $x_1$, then we'd be mistaken. The truth of the matter (in this case) would be that on average, $y$ increases by about $\hat{\beta}_1 + \hat{\beta}_2m$ with each unit change in $x_1$. This brings us to our next assumption for linear modeling:
+
+**ASSUMPTION 4: INDEPENDENT VARIABLES CANNOT BE LINEARLY CORRELATED**
+
+### Error
+
+Let's look at the relationship between Year Remodeled and First Floor Square Footage.
+
+```{r}
+year_of_interest <- 2007  # change this value ...
+
+model <- lm(sale_price ~ year_remod_add, ames_basic)
+
+pred <- predict(model, 
+        data.frame('year_remod_add' = year_of_interest))
+  
+# PLOT 1
+ames_basic |>
+  ggplot(mapping = aes(x = year_remod_add, y = sale_price)) +
+  geom_jitter(height = 0, width = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE, color = 'lightblue') +
+  geom_vline(mapping = aes(xintercept = year_of_interest,
+                           color = paste('year = ', year_of_interest)),
+             linewidth = 1) +
+  scale_y_continuous(labels = \(x) paste("$", x / 1000, "K")) +
+  scale_x_continuous(labels = \(x) round(x)) +
+  scale_color_manual(values = 'darkorange') +
+  labs(title = "Sales Price by Year Remodeled",
+       x = "Year Remodeled", y = "Sales Price",
+       color = '') +
+  theme_minimal() +
+  theme(legend.position="bottom")
+
+# PLOT 2
+ames_basic |>
+  filter(year_remod_add == year_of_interest) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x = sale_price), color = 'white') +
+  geom_vline(xintercept = pred, color = 'darkorange', linewidth = 1) +
+  scale_x_continuous(labels = \(x) paste("$", x / 1000, "K")) + 
+  labs(title = paste("Histogram of Actual Sales Prices at Year = ",
+                     year_of_interest),
+       subtitle = paste("Predicted Sales Price this year =", round(pred))) +
+  theme_hc()
+```
+
+For each value of the `year_remod_add`, we see that the actual values are normally distributed *roughly* about a mean at the predicted value. Recall that an error is the difference between the predicted value and the actual value. Of course, we want this to be consistent across all predicted values. This leads us to the another assumption of linear regression:
+
+**ASSUMPTION 5: ERRORS ARE NORMALLY DISTRIBUTED OVER THE PREDICTION LINE**
+
+### Evaluation and Diagnostics
+
+#### Five Assumptions of (Inferential) Linear Regression
+
+In review, we've just listed the five assumptions of linear regression:
+
+-   **VARIABLE** $x$ **IS LINEARLY CORRELATED WITH RESPONSE** $y$**.**
+-   **ERRORS HAVE CONSTANT VARIANCE ACROSS ALL PREDICTIONS**
+-   **OBSERVATIONS ARE INDEPENDENT** **AND UNCORRELATED**
+-   **INDEPENDENT VARIABLES CANNOT BE LINEARLY CORRELATED**
+-   **ERRORS ARE NORMALLY DISTRIBUTED OVER THE PREDICTION LINE**
+
+Diagnosing our model is akin to ensuring that these assumptions are met, and evaluation is determining how well our model is fit.
+
+#### Coefficients
+
+Consider that the coefficient for a model can be very close to zero, i.e., the relationship between $X$ and $Y$ would be essentially zero. This can be a hypothesis test, and we can determine if there is enough evidence against the claim that there is no relationship between a variable and the response. Let's return to the model which used the interaction term.
+
+```{r}
+model <- lm(sale_price ~ year_remod_add + great_qual 
+            + year_remod_add:great_qual, ames_basic)
+
+tidy(model, conf.int = TRUE)
+```
+
+Notice how the top two p-values are very high. This indicates that there is not sufficient evidence that the year remodeled and interaction term have a significant effect on price. We can also visualize these tests as confidence intervals instead.
+
+```{r}
+tidy(model, conf.int = TRUE) |>
+  ggplot(mapping = aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = 'dotted', color = 'gray') +
+  geom_errorbarh(mapping = aes(xmin = conf.low, xmax = conf.high, 
+                               height = 0.5)) +
+  labs(title = "Model Coefficient C.I.") +
+  theme_minimal()
+```
+
+It's true that 0 is contained in the `great_qual` confidence interval, but intuitively, the house quality really should effect the price, so likely we'd need to consider other variables in a new model.
+
+#### R-Squared
+
+A metric that is often used for linear regression is $R^2$, or the *coefficient of determination*. The idea behind this metric is to measure the "variance explained" in the response variable by the model. The response variable has an intrinsic variance from its mean $\overline{y}$ given by $\sum_{i=1}^{n} (y_i - \overline{y})^2$ which we call *SST* (sum of the squares total), and we then think of the ratio $SSE/SST$ as the % of variance that remains once we've modeled the data. Since we want *% variance explained* we take the difference between 1 and this ratio:
+
+$$R^2 = 1 - SSE/SST$$
+
+*(So, for all inferential models,* $0\leq R^2 \leq 1$*.)*
+
+If the model is a perfect fit, $SSE = 0$ so $R^2 = 1$. On the other hand, if we have a constant model that predicted the mean for all observations, $SSE=SST$, so $R^2 = 0$. So, $R^2$ measures how good our regression fit is *relative* to a constant model that predicts the mean.
+
+**There is no notion of an** $R^2$ **value that is "too low"**. **It should only be used to compare one model to another.**
+
+*(Some problems are just harder than others!)*
+
+#### Influence and Leverage
+
+"Outlier" is a term used to describe one point among many **in a column of data**. "Leverage" approaches the same idea, but from the perspective of linear regression. It is concerned with the amount to which a point **influences** the "lever" represented by the regression line. If the leverage for a point is high, we call it an "influential point".
+
+Cook's Distance, or **Cook's D**, measures the amount to which a model's fitted values would change if a point were removed. In other words, it is a measure of leverage for each observation. *As a rule of thumb: an observation with Cook's distance larger than three times the mean Cook's distance might be an outlier.*
+
+$$
+\text{Cook's D} = \displaystyle D_{i} = {\frac {\sum _{j=1}^{n}\left(\hat {y}_j-\hat{y}_{j(i)}\right)^{2}}{p\cdot s^{2}}}
+$$
+
+This is a calculation for each observation $i$, and $\hat{y}_{j(i)}$ is the fitted value for observation $j$ when observation $i$ is removed from the model.
+
+```{r}
+model_3 <- lm(y3 ~ x3, anscombe)
+model_4 <- lm(y4 ~ x4, anscombe)
+
+anscombe <- anscombe |>
+  mutate(influential_3 = y3 > 11,
+         influential_4 = x4 > 11,
+         cooks_3 = cooks.distance(model_3),
+         cooks_4 = cooks.distance(model_4))
+```
+
+Different kinds of "outliers" yield different leverage values.
+
+```{r}
+anscombe |>
+  ggplot(mapping = aes(x = x3, y = y3)) +
+  geom_point(size = 2, color = 'darkblue') +
+  geom_text_repel(data = filter(anscombe, influential_3),
+                  mapping = aes(label = paste("Cook's D",
+                                              round(cooks_3, 3))),
+                  color = "darkred") +
+  geom_smooth(data = filter(anscombe, influential_3 == FALSE),
+              method = 'lm', se = FALSE, color = 'lightblue') +
+  geom_smooth(method = 'lm', se = FALSE, color = 'darkred') +
+  theme_minimal()
+```
+
+### Model Summary
+
+In R, the model `summary` gives us an overview of our model
+
+```{r}
+model <- lm(sale_price ~ year_remod_add + great_qual 
+            + year_remod_add:great_qual, ames_basic)
+
+summary(model)
+```
+
+-   The [Adjusted R-squared](https://en.wikipedia.org/wiki/Coefficient_of_determination#Adjusted_R2) value is meant to account for the natural increase in $R^2$ as more explanatory variables are added.
+-   The F-Test is as we've seen before, but here the null hypothesis is that all the coefficient values are 0. So, e.g., here it is very unlikely that all the coefficients are 0, so one of these explanatory variables likely has a linear relationship with the response.
+
+#### Diagnostic Plots
+
+We can evaluate all our assumptions by looking at diagnostic plots.
+
+```{r}
+# in gg_diagnose use * instead of : for interactions
+model <- lm(sale_price ~ year_remod_add + lot_area, ames_basic)
+
+gg_resfitted(model) +
+  theme_minimal()
+```
+
+For this particular plot, we can already see that one of our assumptions is being violated, in that the variance in errors increases for higher sales prices.
+
+#### EXERCISE
+
+Take a look at the other [lindia diagnostic plots](https://github.com/yeukyul/lindia). Select at least 3 others, and determine if any assumptions are being violated in the model above. For each plot, explain why.
+
+```{r}
+print("your code here")
+```
+
+*Note: You may need to do a bit of research. For example, the Q-Q plot illustrates how well residual distributions line up with the normal distribution. You can see an explanation for this particular plot [in the reading](https://www.modernstatisticswithr.com/modchapter.html#) or on [Wikipedia](https://en.wikipedia.org/wiki/Q%E2%80%93Q_plot#Interpretation).*
+
+#### A Note on Error Metrics
+
+Error metrics are far more useful when doing predictive statistics. When we do inferential statistics, the notion of "expected error" is not applicable. That is, here are not looking to predict on new values, rather, we're trying to understand relationships between variables. However, you can calculate them here in R:
+
+```{r}
+# sum of squared errors
+sse <- sum(model$residuals ^ 2)
+
+# mean squared error
+mse <- mean(model$residuals ^ 2)
+
+# root mean squared error
+rmse <- sqrt(mse)
+
+# mean absolute error
+mae <- mean(abs(model$residuals))
+
+# mean absolute percent error
+mape <- mean((abs(model$residuals) + 1) / 
+               (predict(model) + 1))
+
+c('sse' = sse, 'mse' = mse, 'rmse' = rmse, 'mae' = mae, 'mape' = mape)
+```
+
+## Simpson's Paradox
+
+[Demonstration ...]

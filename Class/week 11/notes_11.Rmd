@@ -1,0 +1,341 @@
+# Generalized Linear Models, Part 2
+
+-   MLE
+-   Comparing Models
+-   Adding Explanatory Variables
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(broom)
+library(lindia)
+library(car)
+```
+
+For this notebook, we'll need to retrieve the data we used in the previous notebook:
+
+```{r}
+url <- "https://raw.githubusercontent.com/leontoddjohnson/i590/main/data/apartments/apartments.csv"
+
+apts <- read_delim(url, delim = ',')
+
+# repeating the transformations
+apts <- apts |>
+  mutate(price_per_sqft_2 = price_per_sqft ^ 2,
+         log_price = log(price),
+         sqrt_sqft = sqrt(sqft))
+```
+
+## Maximum Likelihood Estimation
+
+We have seen that as long as the relationship between $x$ and $y$ is monotonic, we can construct a "generalized linear model." We just need a link function for our linear component, and some probability distribution family for $y$. However, once we select a probability distribution for $y$, we redefine how "error" should be calculated. For example, minimizing the squared errors might not always define the "best" model. So we need a general way to minimize cost for any fit "curve".
+
+**With GLMs, minimizing cost translates to maximizing likelihood**, depending on the probability distribution of the response variable.
+
+Recall Bayes' Theorem:
+
+$$
+P(\theta|\mathcal{D}) = \frac{P(\mathcal{D}|\theta)P(\theta)}{P(\mathcal{D})}
+$$
+
+Here, we have some data $\mathcal{D}$ (which consists of $x_i$ observations and $y$ values), and we are looking for a parameter $\theta$ which maximizes $P(\theta|\mathcal{D})$. E.g., $\theta$ could be *"the average price given that the square footage of an apartment is 1500"*. However, $P(\theta)$ and $P(\mathcal{D})$ are essentially unavailable to us, but maximizing $P(\theta|\mathcal{D})$ is equivalent to maximizing $P(\mathcal{D}|\theta) = \mathcal{L}(\theta|\mathcal{D})$, which is our *likelihood* of $\theta$ given $\mathcal{D}$.
+
+### Coin Flips
+
+Coin flips are distributed by the Binomial Distribution (much like $y$ in Logistic Regression). Say we get $n$ heads out of $N$ flips (i.e., our data $\mathcal{D}$), where maybe each row of the binary $y$ sums to $n$. Then we are interested in $\theta = p$, the probability of flipping a heads. In this way,
+
+$$
+\mathcal{L}(\theta|\mathcal{D}) = \mathcal{L}(p|n) = P(n|p) = \binom{N}{n}p^n(1-p)^{N-n}
+$$
+
+We want the most likely $\theta = p$ which maximizes this likelihood.
+
+```{r}
+n_flips <- 10
+n_observed <- 6
+
+# 10 flips per candidate P(Heads): (0.25, 0.5, 0.75)
+df_flips <- data.frame(
+  flips = rep(seq(0, n_flips), 3),
+  probs = c(rep(0.25, n_flips + 1), 
+           rep(0.5, n_flips + 1), 
+           rep(0.75, n_flips + 1))
+)
+
+ggplot(data = df_flips,
+       mapping = aes(x = flips,
+                     y = dbinom(flips, size = n_flips, prob = probs),
+                     color = paste("p = ", probs))) +
+  geom_line() +
+  geom_point(size = 2) +
+  geom_vline(xintercept = n_observed, 
+             color = 'gray', linetype = 'dashed', linewidth = 1) +
+  labs(title = "Likelihood for Candidate Coin Probabailities",
+       x = "Number of Flips",
+       y = "Likelihood",
+       color = '') +
+  scale_x_continuous(breaks = 0:10) +
+  scale_y_continuous(limits = c(0, 0.5)) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_hc()
+```
+
+Here, we have different likelihood curves for different candidate values of $p = P(\text{Heads})$, and given some observed data $n$ Heads out of $N$ flips, we have a likelihood $\mathcal{L}(p|n)$. For example, if we observe 6 heads out of 10, then the parameter value which *maximizes* our likelihood is $p = 0.5$. *Note: You might notice that if we could see the curve for* $p = 0.4$, *we'd probably pick that one.*
+
+### Cost Function
+
+In general, the same principle is applied to generalized linear models. For example, for ordinary linear regression, we have $y$ modeled by the Normal Distribution. Specifically, the error values are normal with a mean of 0 and standard deviation of $\sigma=\text{SE}$ (the standard error). So, for a single observation $(y, x)$, we use the PDF for the normal distribution,
+
+$$
+\mathcal{L}(\beta|(y, x)) = P((y, x)|\beta) = \frac{1}{\sigma\sqrt{2\pi}}\text{exp}\left[-\frac{(y - \beta x)^2}{2\sigma}\right]
+$$
+
+But this is for just one observation, whereas we have $N$ *independent* observations (and this is where the independence is most important). Recall that for independent events $A$ and $B$, we have
+
+$$
+P(A\cap B) = P(A) \cdot P(B)
+$$
+
+so, we multiply our probabilities, and use the log to make the calculation more computationally tractable, since $\log(ab) = \log(a) + \log(b)$.
+
+$$
+\begin{align*}
+\mathcal{L}(\beta|\mathcal{D}) &= \prod_{i = 1}^N P((y_i, x_i)|\beta) = \prod_{i = 1}^N \frac{1}{\sigma\sqrt{2\pi}}\text{exp}\left[-\frac{(\beta x_i - y_i)^2}{2\sigma}\right] \\
+\log\left(\mathcal{L}(\beta|\mathcal{D})\right) &= \log\left(\prod_{i = 1}^N \frac{1}{\sigma\sqrt{2\pi}}\text{exp}\left[-\frac{(\beta x_i - y_i)^2}{2\sigma}\right]\right) \\
+&= \sum_{i = 1}^N \log\left(\frac{1}{\sigma\sqrt{2\pi}}\text{exp}\left[-\frac{(\beta x_i - y_i)^2}{2\sigma}\right]\right) \\
+&= -\frac{N}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2}\sum_{i = 1}^N (\beta x_i - y_i)^2
+\end{align*}
+$$
+
+Since $-\frac{N}{2}\log(2\pi\sigma^2)$ and $\frac{1}{2\sigma^2}$ are both constant values given $N$ (and estimated standard error $\sigma$), maximizing the log-likelihood of our $\beta$ values is equivalent to *minimizing* the Sum of Squared Errors $\sum_{i = 1}^N (\beta x_i - y_i)^2$. This is why we use it as our cost function in linear regression.
+
+**MLE is the method use by `glm`** **to determine what "cost" to minimize.**
+
+#### Logistic Regression
+
+It can be shown that the same process above can be used to arrive at the cost function for logistic regression:
+
+$$
+\mathcal{J}(\beta) = -\frac{1}{n}\left(\sum_{i=1}^n y_i \log \hat{p}_i + (1-y_i) \log (1-\hat{p}_i)\right), \quad\quad \hat{p}_i\text{ is a function of }\beta
+$$
+
+This is called the **cross-entropy**. Here $y_i \in \{0,1\}$, so we can tell:
+
+-   when $y_i = 1$ (i.e. the house is actually in SF), the contribution is $-\log p_i$. The closer $p_i$ is to 1, the smaller the cost. If $p_i = 0$ (that is, we claimed it was impossible for this house to be in SF) then we incur an infinite penalty.
+-   when $y_i = 0$ (i.e. the house is actually in NY), the contribution is $-\log(1-p_i)$. The closer $p_i$ is to 0, the smaller the penalty. If we claimed $p_i = 1$ (i.e. this house in NY *must* be in SF) then we incur an infinite penalty.
+
+The effect is that we are trying to get the model to optimize the coefficients by giving **small cost to correct estimations with high confidence**, a medium cost to estimations it waffles on (i.e., doesn't really commit one way or the other), and a **high cost to those it estimates *incorrectly* and with high confidence**.
+
+## Comparing Models
+
+### Deviance
+
+Suppose we had the *perfect* model, with a different parameter for every data point. In the case of linear regression, the SSE would be zero, and we'd be left with $-\frac{N}{2}\log(2\pi\sigma^2)$ as the log-likelihood for our parameter selection. This is called the **saturated** log-likelihood for a "saturated" model (which caters to every data point). We denote the log-likelihood as $\ell$, and call $\ell_s$ to be the saturated log-likelihood. So (as we can see in the SSE example above),
+
+$$
+\ell = \log\left(\mathcal{L}(\theta|\mathcal{D})\right) = \ell_s - \mathcal{J(\theta;\mathcal{D})}
+$$
+
+Where $\mathcal{J}$ is the cost function. The **deviance** of a model is represented by $2(\ell_s - \ell)$, and we'd like it to be as close to zero as we can.
+
+**This value should only be used to *compare* models.** It is not a good measure of model goodness-of-fit on its own for a single, unitary model.
+
+```{r}
+model1 <- glm(in_sf ~ elevation, data = apts,
+             family = binomial(link = 'logit'))
+
+model2 <- glm(in_sf ~ sqft, data = apts,
+             family = binomial(link = 'logit'))
+
+paste("Model 1 Deviance", round(model1$deviance, 1))
+paste("Model 2 Deviance", round(model2$deviance, 1))
+```
+
+Comparing the two models above, for example, we can see that `elevation` is more informative when it comes to trying to understand whether an apartment is in San Francisco vs. New York. However, this does not inform whether either model is a "good" model.
+
+### Akaike Information Criterion
+
+Whenever we model some response variable, we reduce it to some estimated "curve" (e.g., linear regression forces estimations to lie on a line). Therefore, we are always **losing** **information** inherent in the phenomenon, manifested as error. The Akaike Information Criterion (AIC) relies on [information theory](https://en.wikipedia.org/wiki/Information_theory) to estimate the *relative* amount of information lost by a given model, compared to other models: the smaller (more negative) the AIC, the less information which is lost.
+
+-   **we want this value to be as negative as possible**
+-   **we use it to *compare* models**, much like deviance, or $R^2$.
+
+AIC is defined as:
+
+$$
+\text{AIC} = 2(k - \hat{\ell})
+$$
+
+where $k$ is the number of estimated parameters (i.e., the number of columns of data used plus 1 for the "constant variance" assumed) in the model, and $\hat{\ell}$ is the maximized value of $\ell$ (above) after calculating the cost $\mathcal{J}$ from our data.
+
+```{r}
+paste("Model 1 AIC", round(model1$aic, 1))
+paste("Model 2 AIC", round(model2$aic, 1))
+```
+
+Suppose we fit $m$ models, and we calculate $\text{AIC}_i$ for each one. If we order them based on their $\text{AIC}$ such that $\text{AIC}_1 < \text{AIC}_2 \leq ... \leq \text{AIC}_m$. Then compared to the best option, model $i$ is $e^{\frac{1}{2}(\text{AIC}_1 - \text{AIC}_i)}$ "percent" as likely to minimize the information loss. E.g., in our case, $e^{\frac{1}{2}(304.1 - 675.6)} \approx 0$. So Model 1 is *far* more likely to minimize information loss.
+
+The AIC is closely related to the deviance, but it adds a slight penalization for more parameters added to the model. This makes sense: if we can do a better job using *fewer* columns of data, then a simple model will be preferred over a complex model with the same performance.
+
+### Bayesian Information Criterion
+
+Similar to the AIC is the Bayesian Information Criterion (BIC), which also uses the maximum likelihood estimator as well as the number of parameters in the model. We define BIC as
+
+$$
+\text{BIC} = k\log(n) - 2\hat{\ell}
+$$
+
+Where $k$ and $\hat{\ell}$ are defined as above, $\log$ is the natural log $\ln$, and $n$ is the number of rows of data.
+
+```{r}
+paste("Model 1 BIC", round(BIC(model1), 2))
+paste("Model 2 BIC", round(BIC(model2), 2))
+```
+
+The BIC penalizes parameters based on the number of rows of data. Having more parameters with smaller data sets affects the BIC more than having more parameters with larger data sets. This is due to the "diminishing" returns of the $\log$ function.
+
+### ANOVA
+
+Recall that ANOVA evaluates the variance of a response variable across and between different group levels. The null hypothesis for ANOVA is that the introduction of a "group" variable $x_i$ does not inform the overall mean. I.e., the overall mean of the response is the same thing as the overall mean between/within groups --- no "model improvement" is added with $x_i$.
+
+Consider an ordinary linear model with some variance in residuals (or a GLM with some deviance). If we *add* a new explanatory variable $x_i$ to this model, we are interested in whether the residual variance (or deviance) is any different. I.e., are we looking at two different models, or just one within a superfluous variable.
+
+**The ANOVA between *nested* models tests for equal residual variance (or deviance) as variables are introduced.**
+
+Suppose we start with a baseline model `price ~ 1` (a simple average), then incorporate the `sqrt_sqft`, then add in `beds`. We'll investigate if all of these are the "same" model, or if adding variables yields a difference in residual variance (or deviance).
+
+```{r}
+# baseline model
+model0 <- glm(price ~ 1, data = apts, 
+             family = poisson(link = 'log'))
+
+model1 <- glm(price ~ sqrt_sqft, data = apts, 
+             family = poisson(link = 'log'))
+
+model2 <- glm(price ~ sqrt_sqft + beds, data = apts, 
+             family = poisson(link = 'log'))
+```
+
+Since we're looking at Poisson `glm` models, we use the Chi-Squared Test for difference in *deviance*. With normal `lm` models, we could use the F test for difference in SSE (as usual).
+
+```{r}
+# T
+anova(model0, model1, model2, test = "Chisq")
+```
+
+With each introduction of a variable, not only do we reduce the deviance, but we do so in such a way that yields very small p-values. In other words, if each of these models have the same deviance, it would be *very* unlikely to see these three fitted models with the deviances they have.
+
+### EXERCISE
+
+Build two nested GLM models using the `apts` data (i.e., both sharing one variable, but one with an added variable not in the other). Compare the above model comparison methods by running them with the two models you've built. Do they all agree?
+
+## Adding Explanatory Variables
+
+As we increase the number of explanatory variables, we cause our model to become more and more complex. This causes a few consequences:
+
+-   Predictions (and interpretations) become unstable
+-   Interpretations become more difficult and nuanced
+-   The chances of multicolinearity increase exponentially
+-   R-Squared value is artificially inflated
+
+### Variance Inflation Factor
+
+Consider the correlation matrix formed by a few explanatory variables from the `apts` dataset (suppose we're modeling price).
+
+```{r}
+cor(select(apts, year_built, sqft, elevation, beds, bath))
+```
+
+We can use the correlation plot above to capture *collinearity* by gauging the magnitudes of the correlation coefficients between variables. But, to capture *multicollinearity*, it is best to use the [Variance Inflation Factor](https://en.wikipedia.org/wiki/Variance_inflation_factor) (VIF). The VIF is calculated by
+
+$$
+\text{VIF} = \frac{1}{1 - R_j^2}\ ,
+$$
+
+where $R_j^2$ is the r-squared value for the linear model where $X_j$ is the response variable regressed on all the other predictors (i.e., we remove $Y$ from this model).
+
+**The VIF is a measure of how much the *variance* of the** $j$th coefficient is affected by changes in the other predictors. *So, if the VIF is 25, the standard error for the coefficient of that predictor variable is* $\sqrt{25} = 5$ times larger than if that predictor variable had 0 correlation with the other predictor variables. A [rule of thumb](https://en.wikipedia.org/wiki/Variance_inflation_factor#Step_three) is to keep each VIF below 10.
+
+```{r}
+model <- glm(price ~ year_built + sqft + elevation + beds + bath,
+             data = apts, 
+             family = poisson(link = 'log'))
+
+vif(model)
+```
+
+Of course it makes sense that the `beds` would be strongly affected by changes in `bath`, and vice versa. In this case, we should want to remove one of them. Realistically, either is fine, but you might consider keeping the one that most likely "drives" the other. In this case, it makes sense for the bedrooms to "drive" the number of bathrooms.
+
+```{r}
+model <- glm(price ~ year_built + sqft + elevation + beds,
+             data = apts, 
+             family = poisson(link = 'log'))
+
+vif(model)
+```
+
+### Adjusted R-Squared
+
+Recall the function for R-Squared. Note, **this value is only valid for ordinary linear regression.**
+
+$$
+R^2 = 1 - {{SS_\text{res}}\over{SS_\text{tot}}}\ ,\quad SS_\text{res} = \sum_{i = 1}^n (\hat{y}_i - y_i)^2
+$$
+
+A consequence of this function is that as we introduce (many) more variables in the model, we decrease the errors and the $SS_\text{res}$. Naturally, the quantity then necessarily increases as we introduce more explanatory variables.
+
+The Adjusted R-Squared Coefficient corrects for this artificial increase by "penalizing" more variables used in the model. So, unlike the regular R-squared value, we can use the adjusted R-squared to compare two models with varying numbers of variables:
+
+$$
+R_{\text{adj}}^{2} = {1-{SS_{\text{res}}/{\text{df}}_{\text{res}} \over SS_{\text{tot}}/{\text{df}}_{\text{tot}}}} = 1-(1-R^{2}){n-1 \over n-k-1}
+$$
+
+where
+
+-   $k$ is the number of explanatory variables in the model
+-   $\text{df}_{\text{tot}} = n-1$ is the degrees of freedom for the total sum of squares (we subtract 1 parameter used in the calculation, i.e., the overall mean)
+-   $\text{df}_{\text{res}} = n - k - 1$ is the degrees of freedom for the model residuals (we subtract 1 for the the overall mean as well as each variable/parameter)
+
+```{r}
+lm_1 <- lm(log_price ~ sqrt_sqft, apts)
+lm_2 <- lm(log_price ~ sqrt_sqft + year_built + sqft + 
+             elevation + beds + bath, apts)
+
+paste("R-Squared 1: ", round(summary(lm_1)$r.squared, 3))
+paste("R-Squared 2: ", round(summary(lm_2)$r.squared, 3))
+paste("Adj. R-Squared 1: ", round(summary(lm_1)$adj.r.squared, 3))
+paste("Adj. R-Squared 2: ", round(summary(lm_2)$adj.r.squared, 3))
+```
+
+This difference is more pronounced with smaller sample sizes, and (of course) with larger numbers of variables.
+
+### Variable Selection
+
+Another method for reducing (or selecting) the best variables for a model is to use step-wise selection. In R, we can automate *backward* selection using `step`. The idea is to
+
+1.  Fit the model with all variables, and calculate the AIC
+2.  Test removing each variable individually, and log the coorresponding AIC
+3.  Remove the variable which yields the most negative AIC (more negative = better)
+4.  Repeat until removing variables only increases the AIC.
+
+```{r}
+lm_b <- lm(log_price ~ ., apts)
+
+step(lm_b, direction = "backward")
+```
+
+Setting `k = log(n)` translates to doing the same operation but with BIC. We can also run forward selection, or both backward *and* forward with `direction`
+
+**A few caveats:**
+
+-   This is not an exhaustive search. It's possible to remove variable $a$ then variable $b$ when the combination including $a$ without $b$ was actually optimal.
+-   There are [several reasons why we should avoid automated search methods for variable selection](https://www.stata.com/support/faqs/statistics/stepwise-regression-problems/) (*especially* exhaustive searches).
+    -   In general, these kinds of **automated variable selection methods are better suited for predictive modeling and *not* inferential statistics.**
+    -   The backward-AIC selection process shared above reduces most of the issues mentioned in the aforementioned link.
+
+## A Note on AUC/ROC
+
+*(Supplementary, optional information.)*
+
+The [Receiver Operating Characteristic](https://en.wikipedia.org/wiki/Receiver_operating_characteristic) and the area under its curve (AUC) is a method used for evaluating the classification accuracy (and precision) of a predictive model (such as logistic regression). In fact, it is strictly (and only) concerned with the *predictions* of a model, not the inference which can be drawn from it. Therefore, we do not cover it in this class.

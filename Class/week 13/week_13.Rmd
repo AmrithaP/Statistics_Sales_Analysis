@@ -1,0 +1,182 @@
+---
+title: "Data Dive - Model Critique "
+author: "Amritha Prakash"
+date: "2023-11-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(broom)
+library(lindia)
+library(car)
+```
+### Model Critique:
+For this lab, you’ll be working with a group of other classmates, and each group will be assigned a lab from a previous week. Your goal is to critique the models (or analyses) present in the lab.
+
+### Group: \
+Amritha Prakash, Sumedh Sonawane, Jason Moore, Bhushan Shelke
+
+### Description:
+First, review the materials from the Lesson on Ethics and Epistemology (week 5?). This includes lecture slides, the lecture video, or the reading. You can use these as reference materials for this lab. You may even consider the reading for the week associated with the lab, or even supplementary research on the topic at hand (e.g., news outlets, historical articles, etc.).
+
+For the lab your group has been assigned, consider issues with models, interpretations, analyses, visualizations, etc. Use this notebook as a sandbox for trying out different code, and investigating the data from a different perspective. Take notes on all the issues you see, and possible solutions (even if you would need to request more data or resources to accomplish those solutions).
+
+**Share your model critique in this notebook as your data dive submission for the week.**
+
+As a start, think about the context of the lab and consider the following:
+
+-   Analytical issues, such as model assumptions
+
+-   Overcoming biases (existing or potential)
+
+-   Possible risks or societal implications
+
+-   Crucial issues which might not be measurable
+
+Treat this exercise as if the analyses in your assigned lab (i.e., the one you are critiquing) were to be published, made available to the public in a press release, or used at some large company (e.g., for mpg data, imagine if Toyota used the conclusions to drive strategic decisions).
+
+### Critique - 
+
+We critiqued the Week 10 - Generalized Linear Models (Part 1)
+The lecture was all about plotting various features and identifying if they are suitable for linear model creation, if not how to transform the explanatory or even the response variable. Further there was discussion on logistic regression and Poisson Regression.
+
+We looked into the first part i.e. plotting of linear models and transformation, further have certain questions and suggestions for the same.
+
+-   Was the dataset good?
+
+```{r}
+url <- "https://raw.githubusercontent.com/leontoddjohnson/i590/main/data/apartments/apartments.csv"
+
+apts <- read_delim(url, delim = ',')
+view (apts)
+```
+```{r}
+model <- lm(price ~ sqft,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = sqft, 
+                       y = price)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Price vs. sqft",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+-   Since Week 10 was demonstrating about Transforming Variables, the explanation could have started with a plot suggesting Linear Model. Price vs Sqft would have been the best choice to showcase the same.
+
+-   The variables selected for Linear Model could have been better. We observed the combination of Price with sqft gave a bit more linear relation when compared to price with price_per_sqft.
+
+-   No Transformations were required with the above choice of variables. But Linear Model was understood best.
+
+Following are some model checks for linear model, with various variables \
+1.  Price per sqft vs Beds in New York
+```{r}
+model <- lm(price_per_sqft ~ beds,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = beds, 
+                       y = price_per_sqft)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "price_per_sqft vs. beds",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+\ 
+
+2.  Price per sqft vs Elevation in New York
+```{r}
+model <- lm(price_per_sqft ~ elevation,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = elevation, 
+                       y = price_per_sqft)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "price_per_sqft vs. elevation",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+\
+
+3.  Price vs Elevation in New York
+```{r}
+model <- lm(price ~ elevation,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = elevation, 
+                       y = price)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "price vs. elevation",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+\
+
+4.  Price vs year_built in New York
+```{r}
+model <- lm(price ~ year_built,
+            filter(apts, in_sf == 0))
+
+rsquared <- summary(model)$r.squared
+
+apts |> 
+  filter(in_sf == 0) |>
+  ggplot(mapping = aes(x = year_built, 
+                       y = price)) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'gray', linetype = 'dashed', # model fit - grey , blue = how we want the data to be fit, so that desirable data is obtained
+              se = FALSE) +
+  geom_smooth(se = FALSE) +
+  labs(title = "price vs. year_built",
+       subtitle = paste("Linear Fit R-Squared =", round(rsquared, 3))) +
+  theme_classic()
+```
+
+-   The apts data set is not friendly with demonstrating linear model, majority of the features dont fit together. It would be better to make use of data set with more variables that are continuous. 
+    so that we can demonstrate linear model or even transform them, as the above plots are not even good enough to make them linear.
+
+
+-   If we question the following -> What could happen to the above different model if it deployed on a platform like Zillow?
+    The data set wont work well with linear model (as seen with above plots). If we put this model in the real world. It wont help both the company and buyers to make a choice on how prices fluctuate based on various factors.So overall the dataset isn't that good.
+
+
+-   Suggestion : To maybe add certain explanation/ cheat code about various lines and their expressions. This would be helpful to mutate the variables for transforming the data for plotting linear models.
+
+- Unable to do transformation on other variables for example, beds, baths, and elevation. Since the model fits linearly with only price or price per sqft or sqft. Being able to do transformation to make the linear model fit better will be difficult to test. So as students or even the organization could not experiment on all variables to test this dataset.

@@ -1,0 +1,606 @@
+# A Few Announcements
+
+-   Data Dive and Knitting with R
+-   Dataset for next week (and on)
+-   MS Teams vs. Canvas
+-   Data Dives vs. Labs
+
+# Probability and Counting
+
+Topics covered in this notebook:
+
+-   Sets (things)
+    -   Sample Space and Events
+    -   Independent Processes and Disjoint Events
+    -   Union, Intersection, and Complement
+    -   Combining Probabilities
+-   Combinatorics (counting part)
+    -   Permutations with Repetition
+    -   Permutations *without* Repetition
+    -   Combinations
+    -   Combining Probabilities, cont'd
+-   Frequentist Perspective
+    -   Law of Large Numbers
+    -   Expected Value
+-   R functions, looping, and mapping
+-   Bayesian Perspective
+    -   Definitions (prior, posterior, likelihood, etc.)
+    -   The Monty Hall Problem
+-   Stochastic Modeling
+
+## Sets
+
+Along with data, probability is a foundational element to statistics. In this class, we define probability to be **the expected proportion of infinitely many random process iterations resulting in a target event.** This number ranges from zero (impossibility) to one (absolute certainty), inclusively.
+
+### Sample Space and Events
+
+The basis for probability consists of: a random process, its sample space of outcomes, and a target event.
+
+First, a **random process** is an observable or theoretical phenomenon which has an element of unpredictability.
+
+Let's use a familiar random process: rolling a 6-sided dice once. We define our sample space as **all possible outcomes of the random process**. In this case, we have the six different sides $S = \{1, 2, 3, 4, 5, 6\}$.
+
+```{r}
+roll <- 1:6  # we use `:` to quickly create a sequence
+roll
+```
+
+> Note: an outcome could be made up of multiple "elements". For instance, if the random process were rolling a dice *twice*, our sample space would have 36 elements: $S_2 = \{(1, 1), (1, 2), \dots, (1, 6), (2, 1), (2, 2), \dots, (2, 6), \dots, (6, 6)\}$.
+
+Suppose we are interested in rolling an even number. This is our target event, where **an event is a set of target outcomes.** Notice, an event is a set of outcomes from the sample space. In this case, the target event is represented by the set $\text{even} = \{2, 4, 6\}$.
+
+```{r}
+even_roll <- seq(2, 6, 2)  # from 2 to 6 by step size 2 (in order)
+even_roll
+```
+
+This is just one example of an event. We could have the event of rolling a 4, or the event of rolling a prime number. We cannot have the event of rolling a 0 or a 7.
+
+Finally, *if* we know the number of possible outcomes in (cardinality of) the whole sample space *and* the number of outcomes consisting an event, we can define probability as
+
+$$
+P(\text{event}) = \frac{|\text{event space}|}{|\text{sample space}|}
+$$
+
+Where the bars represent cardinality, or "size". For example, the probability of rolling an even dice would be
+
+$$
+P(\text{even}) = \frac{|\{2, 4, 6\}|}{|\{1, 2, 3, 4, 5, 6\}|} = \frac{3}{6} = 0.5
+$$
+
+### Independent Processes and Disjoint Events
+
+An event is both the result of a random process, and it is a set of outcomes (elements) from some sample space. Two random processes (even if they are the same) can be independent or conditional, and two outcomes can be disjoint or not disjoint.
+
+#### **Independent vs. Conditional Processes**
+
+Two random processes are **independent** if the result of one does *not* affect the probabilities of the other. For example, if we look at rolling a dice and flipping a coin, these two are independent processes. The result of the dice roll does not affect the probability of flipping heads. Alternatively, pulling a stone from a bag of black and white stones, and then pulling another stone from the same bag are not independent; the former affects the probabilities of the latter. In other words, the latter is **conditional** on the former.
+
+Given a bag of 10 stones, 5 black and 5 white, let's randomly select a stone, then calculate the probability of drawing a black stone from what's left over.
+
+```{r}
+# define our sample space, for both processes
+bag <- c(rep("black", 5), 
+         rep("white", 5))
+
+# print known probabilities
+cat("P(white stone) =", 5/10, "  P(black stone) =", 5/10)
+
+cat("\n")
+# select (remove) a stone (the same as sampling all but one)
+bag <- sample(bag, 9, replace = FALSE) # No replacement = 
+bag
+
+# calculate the new probabilities
+num_black <- length(bag[bag == "black"])
+num_white <- length(bag[bag == "white"])
+cat("\n")
+# print new probabilities
+cat("\nP(white stone) =", num_white / 10, 
+    "  P(black stone) =", num_black / 10)
+```
+
+Notice how the probabilities change after the first stone selection. What should happen if we run this cell enough times?
+
+#### EXERCISE
+
+We can select elements from a vector based on their indices. E.g., `x[c(1, 4, 5)]` returns the 1st, 4th, and 5th elements of `x`. Can you repeat the process outlined above using this method?
+
+#### **Disjoint vs. Not Disjoint**
+
+Two events are disjoint if there is no outcome in which both events are true. In other words, two events are disjoint if their sets are mutually exclusive. For example, the event of rolling an even number is disjoint from the event of rolling an odd number.
+
+### Union, Intersection, and Complement
+
+We can combine sets (events) in a couple of ways:
+
+#### **Union**
+
+The **union of two sets is the collection of all elements contained in at least one of the sets**. For example, we could consider the union of the set of even rolls ($\text{even}$ above), and the set of rolls less than 3, $\text{LT3} = \{1, 2\}$.
+
+```{r}
+lt3 <- c(1, 2) # Event lt3 = rolls less than 3
+lt3 
+even_roll
+union(lt3, even_roll) # JOINT event - as they have common elemnents, here 2
+```
+
+#### **Intersection**
+
+The **intersection of two sets is the collection of all elements contained in both of the sets**. For example, we could consider the intersection between the set of even rolls ($\text{even}$ above), and the set of rolls less than 3, $\text{LT3} = \{1, 2\}$.
+
+```{r}
+intersect(lt3, even_roll)
+```
+
+Note: if the intersection of two events is empty, then those two events are disjoint! In this case, the intersection between even rolls and rolls less than three have something in common (namely, rolling a 2). So, they are not mutually exclusive/disjoint.
+
+#### **Complement**
+
+Lastly, **the complement of a set is all elements (in its sample space) not contained in that set**. In the case of the set (event) of an even roll, the complement would be odd rolls:
+
+```{r}
+setdiff(roll, even_roll)  # the complement is a special "set difference"
+```
+
+### Combining Probabilities
+
+We know how to calculate the probability of a single event. But, in practice, we are far more interested in how to calculate the probability of multiple events (take each row of data, for example ...). With any two events $A$ and $B$, let's use the $\cup$ operator to denote union ("OR"), the $\cap$ operator to denote intersection ("AND"), the bar $A|B$ to denote "$A$ given $B$" (conditional), and $A^c$ implies the compliment of $A$ (sometimes you'll see $\neg$ to represent "not"; in most cases, this is also the compliment).
+
+|                            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+|------------|:-----------------------------------------------------------|
+| Union of two events\*      | $$                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P(A\cup B) = P(A) + P(B) - P(A \cap B)                                        
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $$                                                                            |
+| Two independent events     | $$                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P(A\cap B) = P(A) \times P(B)                                                 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $$                                                                            |
+| Two conditional events\*\* | $$                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P(A \cap B) = P(A|B) \times P(B)                                              
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $$                                                                            |
+| Any event $A$              | $$                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P(A) = 1 - P(A^c)                                                             
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $$                                                                            |
+
+*\*Remember, the intersection of two mutually exclusive sets is empty, so the last term here equates to zero in the case where both events are disjoint.*
+
+*\*\*Notice how this reduces to the prior case when the events are independent!*
+
+#### EXERCISE
+
+Using the dice roll, and coin toss examples, write out some code which calculates an example of each of the above four probability combinations. But, only use the numbers `1, 2, 3, 4, 5, 6` (only to denote dice roll outcomes, not cardinality), or the strings `"H", "T"` in your code. Any probabilities should be the result of R functions and operations.
+
+*E.g., for the first one, I might write code to calculate the probability of rolling a 4 or a prime number.*
+
+```{r}
+print("your code here")
+roll <- list(1:6)
+#typeof(roll)
+coin <- list("H","T")
+#typeof(coin)
+
+A <- 4
+B <- list(2,3,5)
+P_AorB <- 4/6
+
+```
+
+## Combinatorics (Counting)
+
+So far, we've looked at probabilistic events which occur on quite a small scale (e.g., there are only six sides of a dice, and two faces of a coin). But, statistics was designed to be used on a large scale. Thus, if we want to investigate probability on such a scale, we need to employ **Combinatorics**, the branch of mathematics which deals especially with counting.
+
+-   Repetitions
+-   Permutations
+-   Combinations
+-   Combining Probabilities, cont'd
+
+### Permutation with Repetition
+
+For the sake of simplicity, let's return to flipping coins. In this case, though, let's think about flipping a coin $k$ times. So, we log the first flip, the second flip, ..., etc., all the way to the $k$-th and final flip. How many different sequences of flips are there? In other words, how many ways can we permute our placement of Heads (or Tails)?
+
+For 3 flips, we could systematically write them out: HHH, HHT, HTH, THH, HTT, THT, TTH, or TTT. But, for a variable number $k$, we need something more formulaic.
+
+Well, there are 2 ways the first flip can go. *For each of these options* (once the first flip is decided), there are 2 further ways the next flip can go. So, there are $2\times2$ ways we can organize the first two flips. Next, for each of those, there are 2 ways we can organize the third flip, and continuing on, we have $2 \times 2 \times 2$. If you repeat this process, you'll see that for $k$ flips, there are $2^k$ different ways we could sequence our outcomes.
+
+```{r}
+# number of flips
+n <- 7
+
+cat("Ways to sequence", n, "flips:", 2^n)
+```
+
+In general, the number of permutations for $k$ repeated iterations of $n$ options is $n^k$.
+
+### EXERCISE
+
+Let's consider the characters on a vehicle license plate. In Indiana, the typical serial format of a standard road vehicle is 123ABC, where the first three characters are numbers between 0-9, and the last three are capital letters between A-Z. How many different Indiana licence plates are there?
+
+```{r}
+print("your code here")
+```
+
+### Permutations without Repetition
+
+#### Factorial
+
+Sometimes, once an option is exhausted, it cannot be repeated. Suppose we decide to have seating assignments for a class of $n$ students, and want to know how many ways we can seat the students. Once the first desk is chosen, there are now $n-1$ seat options for the *remaining* $n-1$ students, so for the the first two seats, there are $n \times (n-1)$ ways to place students. Continuing on with this logic, we can see that there are $n \times (n-1) \times (n-2)$ ways to organize the first three seats.
+
+The pattern here expands to:
+
+$$
+n \times (n-1) \times (n-2) \cdots \times 2 \times 1 = n!
+$$
+
+where the exclamation mark is call "factorial". $n$-**factorial** is the number of ways to permute $n$ items in $n$ "slots".
+
+```{r}
+# number of items (and slots)
+n <- 9
+
+# we use the `factorial` function
+cat("Ways to permute", n, "items:", factorial(n))
+```
+
+> *Interestingly, the factorial is the fastest growing operator on a number in mathematics; so this number can get very big, very fast.*
+
+#### Permute
+
+Suppose we had $n$ students, but $k < n$ desks in the classroom; that is, some students will be left standing in the back. Using the same logic as before, we'd have something that looks like
+
+$$
+n \times (n-1) \times (n-2) \times \cdots \times (n-k-1) = \frac{n!}{(n - k)!} = nPk
+$$
+
+here, we stop counting when we run out of the $k$ spots, which bring us to $n - k - 1$.
+
+```{r}
+# number of items
+n <- 20
+
+# number of slots
+k <- 10
+
+# we use the `factorial` function
+cat("Ways to permute", n, "items into", k, "slots:",
+    factorial(n) / factorial(n - k))
+```
+
+#### Combine
+
+In the previous counting examples, we had situations where order mattered. Now, suppose the order doesn't matter, and we're just looking at a grouping or "choosing". Suppose we have a bag containing exactly $n$ numbered stones: 1, 2, ..., n (with no repeats). How many different ways can we choose $k$ stones? (E.g., if $k=3$, choosing stones 2, 4 and 5 is the same thing as choosing stones 5, 2 and 4.)
+
+In a similar way to the permutation example above, we have $n$ options for the first stone we pull, $n-1$ for the next, and so on, until we arrive at $n - k - 1$ options for the last stone pulled. So far, we just have $nPk$ options, but this takes into account order (the "first" stone pulled has a designation). In other words, this number represents one option *for each* "ordering" of the $k$ items. So, we can divide $nPk$ by $k!$, since this is the number of ways to order (permute) $k$ items.
+
+$$
+\frac{1}{k!} \times n \times (n-1) \times (n-2) \times \cdots \times (n-k-1) = \frac{n!}{k!(n - k)!} = nCk = {n\choose k}
+$$
+
+```{r}
+# we use the `combin` function
+cat("Ways to choose", k, "items from", n, "options:",
+    choose(n, k))
+```
+
+#### EXERCISE
+
+Suppose we are rolling a single die 8 times. How many different ways can we roll *at least* two even numbers out of those 8 rolls? *Hint: Recall the different ways we can combine probabilities ...*
+
+```{r}
+print("your code here")
+#1 EVENS
+n <- 8
+k <- 1
+one_even <-choose(n,k)
+one_even
+# or 0 evens
+n <- 8
+k <- 0
+zero_even <- choose(n,k)
+zero_even
+atleast_two_even <- 1- ((one_even * zero_even)/6**8)
+atleast_two_even
+```
+
+## Frequentist Probability
+
+Theoretically (and most intuitively), a probability of some event can be based on the size (cardinality) of the event space and that of the sample space:
+
+$$
+P(\text{event}) = \frac{|\text{event space}|}{|\text{sample space}|} = \frac{\text{# target outcomes resulting in event}}{\text{# all possible outcomes}}
+$$
+
+If we take into account that probabilities are meant to apply to *infinitely* many random processes (i.e., whether they've happened yet or not), this notion is called the **Frequentist** **Perspective** of probability.
+
+Using this and combinatorics, we can start to calculate probabilities on a larger scale. For example, if we roll a dice 10 times, what is the probability of rolling 3 sixes and 7 *other* rolls?
+
+We are looking at the probability $P(\text{3 sixes AND 7 non-sixes})$, *for each* roll sequence with 3 sixes.
+
+First, given a single roll sequence, each roll is independent. So, we can multiply our roll probabilities together (see above):
+
+$$
+\begin{align*}
+P(\text{3 sixes AND 7 non-sixes}) &= P(\text{3 sixes}) \times P(\text{7 non-sixes}) \\
+&= \left(\frac{1}{6}\right)^3 \times\left(\frac{5}{6}\right)^7
+\end{align*}
+$$
+
+And since each sequence is disjoint (of course, they can't happen at once), we just need to add this quantity to itself for each sequence with exactly 3 sixes. We want to have exactly 3 "six-rolls" out of 10 possible options, and there are ${10\choose 3}$ such possible sequences, so we can multiply these quantities together:
+
+$$
+\begin{align*}
+P(\text{3 sixes out of 10 rolls}) &= {10\choose 3}\times P(\text{3 sixes}) \times P(\text{7 non-sixes}) \\
+&= {10\choose 3}\times \left(\frac{1}{6}\right)^3 \times\left(\frac{5}{6}\right)^7
+\end{align*}
+$$
+
+```{r}
+cat("Prob of 3 sixes out of 10:", choose(10, 3) * (1 / 6)^3 * (5 / 6)^7)
+```
+
+> *We will learn later that this is an example of the Binomial Distribution of Bernoulli Trials. Each dice roll is a "Bernoulli Trial" (i.e., a single discrete event) with a known probability of "success", and we have* $k$ *successes out of* $n$ *trials,* $\text{Binom}(k; n, p)$*.*
+
+```{r}
+cat("Prob of 3 sixes out of 10:", dbinom(3, 10, 1/6))
+```
+
+### Law of Large Numbers
+
+Remember, our frequentist perspective is relatively theoretical based on our assumption of uniformity. For example, theoretically, the probability of rolling a six is 1/6 because we assume each side is equally probable. But, practically, this is difficult to see exactly. When you roll a dice six times, you don't *always* roll exactly one six, and not only that, we have no way of knowing *every single* roll of six die out of all the dice rolls for all time in the universe. So, the best we can do is estimate.
+
+```{r}
+# roll the dice `n` times, and log the results
+roll_dice <- function (n) {
+  rolls <- sample(1:6, n, replace=T)
+  rolls
+}
+
+```
+
+Suppose we roll a dice 60 times. We'd expect that 10 of those times ($\frac{1}{6}\cdot60 = 10$) would be a roll of 6.
+
+```{r}
+# run this cell a few times ...
+#x<- roll_dice(60) == 6
+#x
+#sum(x)
+sum(roll_dice(60) ==6 )
+
+```
+
+But, of course, because this is a random (stochastic) event, it's not always the case we get 10. By the way, this method of running multiple random simulations (regardless of the fact that we've aggregated results into one value) is called a **Monte Carlo Simulation**.
+
+As you might expect, if we increase the number of times we roll the dice, that number gets closer to what we'd expect. We can plot this to see how our probability changes as we increase the sample size.
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# out of `n` rolls (for 1 or more `n`s), log proportion that are 6
+rolls_of_6 <- function (n) {
+  # proportion of `x` rolls that result in a 6
+  f <- function (x) (sum(roll_dice(x) == 6) / x)
+  
+  # map that function for each set of `n` rolls
+  map_dbl(n, f)
+}
+
+
+# build a quick dataframe to collect our MC Simulation
+rolls <- seq(1, 10000, length.out = 1000)
+prop_6 <- rolls_of_6(rolls)
+
+df <- data.frame(rolls, prop_6)
+
+ggplot(data = df) +
+  geom_hline(yintercept = 1/6, color = "orange") +
+  geom_line(mapping = aes(x = rolls, y = prop_6),
+            color = "darkblue") +
+  scale_y_continuous(breaks = c(0, 1/6, 1/3),
+                     labels = c("0", "1/6", "1/3"),
+                     limits = c(0, 1/3)) +
+  labs(x = "Number of Dice Rolls",
+       y = "Proportion Resulting in 6",
+       title = "Proportion of 6-rolls for Increasing # of Trials") +
+  theme_classic()
+```
+
+We see that as we increase the **sample size** of trials (i.e., the "sample space"), the resulting number of **target events** (i.e., the "event space") nears closer and closer to our theoretical expected value. This is a visual representation of the Law of Large Numbers: the sample size increases, any parameter approaches the theoretical expected value.
+
+### EXERCISE
+
+Try this for yourself. Build a Monte Carlo Simulation for flipping a coin, and present your results in a *ggplot* as the number of flips increases from 1 to 10000.
+
+```{r}
+print("your code here ...")
+flip_coin <- function (n) {
+  flips <- sample(list("h","t"), n, replace=T)
+  flips
+}
+flip_coin(6)
+
+
+# out of `n` rolls (for 1 or more `n`s), log proportion that are h
+flip_coin_head <- function (n) {
+  # proportion of `x` rolls that result in a 6
+  f <- function (x) (sum(flip_coin(x) == "h") / x)
+  
+  # map that function for each set of `n` rolls
+  map_dbl(n, f)
+}
+
+
+# build a quick dataframe to collect our MC Simulation
+flips <- seq(1, 10000, length.out = 1000)
+prop_head <- flip_coin_head(flips)
+
+df <- data.frame(flips, prop_head)
+
+ggplot(data = df) +
+  geom_hline(yintercept = 1/2, color = "orange") +
+  geom_line(mapping = aes(x = flips, y = prop_head),
+            color = "darkblue") +
+  scale_y_continuous(breaks = c(0, 1/2, 1),
+                     labels = c("0", "1/2", "1"),
+                     limits = c(0, 1)) +
+  labs(x = "Number of coin flips",
+       y = "Proportion Resulting in h",
+       title = "Proportion of head-flips for Increasing # of Trials") +
+  theme_classic()
+```
+
+## Bayesian Probability
+
+As we saw with the frequentist perspective, probability is inherently a theoretical value. That is, we can never *really* know with certainty the probability of a natural phenomenon; we only have theoretical expected values, because Nature isn't perfect.
+
+The idea behind the Bayesian perspective is to look at the issue of probability by assuming every event roughly follows some latent (but deterministic) rule. In other words, any data that we collect on some event is *generated* by a **prior** probability distribution. We can update our understanding of this latent rule by
+
+1.  assume some parameter value(s)
+2.  collect data
+3.  update our assumption (hypothesis) based on the data
+
+The key to this framework is to concern ourselves with two conditional probabilities:
+
+-   the probability of some hypothesized parameter value(s) *given* the data
+-   the probability of observing some data *given* hypothesized value(s)
+
+Let $H$ be some **hypothesis**, and let $\mathcal{D}$ be a dataset of **evidence** against that hypothesis. Then, we have the following equivalence:
+
+$$
+P(H|\mathcal{D})P(\mathcal{D}) = P(\mathcal{D}|H)P(H)
+$$
+
+That is *"if we have some data, and we hypothesize based on that data, we are doing just as good as if we had a hypothesis and generated data based on that hypothesis"*. Typically, though, we're most interested in getting down to the parameters behind the data we see. So, you'll usually see the theorem written as:
+
+$$
+P(H|\mathcal{D}) = \frac{P(\mathcal{D}|H)P(H)}{P(\mathcal{D})}
+$$
+
+-   **Prior Probability =** $P(H)$: Our current belief in the hypothesis $H$ that we commit to before seeing more data $\mathcal{D}$.
+
+-   **Marginal Probability =** $P(\mathcal{D})$: The probability of observing our dataset, over all possible hypotheses.
+
+-   **Likelihood** = $P(\mathcal{D}|H)$ : Probability of observing *our* data $\mathcal{D}$ under hypothesis $H$.
+
+-   **Posterior** = $P(H|\mathcal{D})$ : Our updated belief in the hypothesis $H$, given more data $\mathcal{D}$.
+
+To illustrate this theorem, we'll use [The Monty Hall Problem](https://en.wikipedia.org/wiki/Monty_Hall_problem).
+
+### Monty Hall Problem
+
+There was a game show called Let's Make a Deal. The idea was thus: there are three doors; behind one of the doors is a car (apparently desirable) and behind two of the doors are goats (apparently not so desirable).
+
+Play would then proceed in this way:
+
+-   The player chooses a door ($A$, $B$, or $C$) that they think the car is behind
+-   Monty Hall, the host, opens one of the two doors that the player has NOT selected and reveals a goat (remember, two of the doors have a goat, so whether the player picked a car or a goat, Monty has at least one door he can open)
+-   The player, after seeing which door has been opened and shown to have a goat, gets to decide whether they want to stick with their original choice of door or whether they want to switch
+
+*Note: There are many [variants](https://en.wikipedia.org/wiki/Monty_Hall_problem#Variants) of this problem that make it considerably more interesting, but this one is the most common.*
+
+**The Question: does switching your guess for the door with a car *after* seeing which one Monty opens improve your probability of winning the car?**
+
+We will use a Bayesian simulation to investigate this question a bit further, using the following computational steps:
+
+1.  Define the *winning* door (i.e., out of $A$, $B$, or $C$).
+2.  Randomly choose a door (for the "player")
+3.  Randomly choose a door (for "Monty", a non-winning door)
+4.  Record whether the player would have won from staying vs. switching
+
+We'll run the simulation many (say, 100) times, and record the proportion of cases where a player wins from staying vs switching. We'll then plot the output from these simulations. First, we write a function that simulates play of the game, which returns a short data frame of solutions.
+
+```{r}
+monty_hall <- function() {
+  # initiate the game
+  winning_door <- sample(1:3, 1)
+  player_pick <- sample(1:3, 1)
+  
+  # monty must choose a yet unchosen *non-winning* door
+  monty_choices <- setdiff(c(1, 2, 3), c(winning_door, player_pick))
+  
+  # (see the docs for `sample`)
+  if (length(monty_choices) == 1) {
+    monty_pick <- monty_choices
+  } else {
+    monty_pick <- sample(monty_choices, 1)
+  }
+  
+  # *if* the player switches, it can't be already picked
+  alternative <- setdiff(c(1, 2, 3), c(monty_pick, player_pick))
+  
+  if (length(alternative) != 1) {
+    stop("For some reason, there is more than one alternative")
+  }
+  
+  # save this as a (small) dataframe to bind to the rest
+  probs <- data.frame(
+      stay_won = player_pick == winning_door,
+      switch_won = alternative == winning_door
+  )
+  
+  return(probs)
+}
+```
+
+next, we run the Monte Carlo simulation, and collect (bind) the results from each play of the game.
+
+```{r}
+# simulate playing this game 200 times
+n_iter <- 200
+
+# initialize an empty dataframe
+df_mh <- data.frame()
+
+# for each iteration, play the game and log results
+for (i in 1:n_iter) {
+  df_ <- monty_hall()
+  df_["iter"] <- i  # a quick way to log the iteration
+  df_mh <- bind_rows(df_mh, df_)  # append to the results so far
+}
+```
+
+If you look at `df_mh`, you'll find that it's a Boolean data frame. We want to know the *proportion* of wins (for each column) up to that play of the game. So, we'll use the dplyr function [`cummean`](https://dplyr.tidyverse.org/reference/cumall.html).
+
+```{r}
+df_mh["stay_won_p"] <- cummean(df_mh$stay_won)
+df_mh["switch_won_p"] <- cummean(df_mh$switch_won)
+```
+
+As we play more and more games, we should start to approach the theoretical expected probability of winning for either strategy. (Why?)
+
+We'll plot both:
+
+```{r}
+df_mh |>
+  ggplot() +
+  geom_line(mapping = aes(x = iter, y = stay_won_p,
+                          colour = "Stay")) +
+  geom_line(mapping = aes(x = iter, y = switch_won_p,
+                          colour = "Switch")) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_classic() +
+  labs(
+    title = "Probability of Winning Monty Hall After n simulations",
+    x = "Number of Simulations",
+    y = "Probability of a Win",
+    colour = "Strategy"
+  )
+```
+
+As it turns out, you are more likely to win if you **switch** after Monty opens the alternative door. As paradoxical as this result sounds, think about it from the perspective of the Bayesian Theorem interpretation:
+
+*"If we have some data, and we hypothesize based on that data, we are doing just as good as if we had a hypothesis and generated data based on that hypothesis."*
+
+This does not say anything about *how much* data we're collecting (or generating), but you can imagine that more data yields stronger hypotheses (likewise, stronger hypotheses yield more accurate data). In our case, we collect *more* data when Monty opens the alternative door, informing our hypothesis more, allowing us to make a better estimation for our parameter, the probability that there is a car behind a door.
+
+### EXERCISE
+
+Using scratch paper (or LaTeX math rendering), write an analytical proof of the above result. That is, using Bayes' Theorem, prove that your probability of winning the Monty Hall Problem is higher if you *switch* after Monty opens the alternative door.
+
+///// your answer here /////
+
+# Appendix
+
+## Helpful Resources
+
+-   If you'd like to customize your ggplot visualizations even more, see [these](https://exts.ggplot2.tidyverse.org/gallery/) extensions.
